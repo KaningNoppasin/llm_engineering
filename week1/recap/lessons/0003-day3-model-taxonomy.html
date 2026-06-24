@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 3 — Base, Chat &amp; Reasoning Models</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 1 <span class="dot">●</span> Day 3 Recap</p>
+    <h1>Base, chat &amp; reasoning models</h1>
+    <p class="subtitle">A working taxonomy of LLMs — and the limits frontier models hide behind confidence.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> "which model should we use?" is a question
+    you'll be asked in every AI role and interview. The answer starts with knowing what
+    <em>kind</em> of model you're holding — and trusting none of them blindly.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can explain the difference between a <b>base</b>, a <b>chat/instruct</b>, and a
+    <b>reasoning</b> model — and name when each is the right tool.</p>
+  </div>
+
+  <h2>The taxonomy</h2>
+  <p>Models differ by <em>how they were trained</em>, and that dictates how you use them.</p>
+  <table>
+    <thead><tr><th>Type</th><th>What it is</th><th>Use it for</th><th>Tradeoff</th></tr></thead>
+    <tbody>
+      <tr><td><b>Base</b></td><td>Raw next-token predictor on bulk text; no instruction tuning</td><td>A starting point to fine-tune for novel tasks</td><td>Won't reliably follow instructions; needs prompt tricks</td></tr>
+      <tr><td><b>Chat / Instruct</b></td><td>Base model tuned on system/user/assistant turns via <b>RLHF</b></td><td>Interactive use, fast cheap inference, creative text</td><td>Less deliberate reasoning depth</td></tr>
+      <tr><td><b>Reasoning</b></td><td>Emits a visible <em>thinking</em> trace before the answer</td><td>Puzzles, math, multi-step logic</td><td>Slower &amp; pricier (thinking tokens); can overthink</td></tr>
+      <tr><td><b>Hybrid</b></td><td>Decides per query how much to reason (GPT-5, Gemini 2.5 Pro)</td><td>General-purpose default</td><td>Variable latency</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>RLHF turns a base model into a chat model.</b> Reinforcement Learning from Human Feedback
+      trains the model on good message→response behavior, making it follow instructions.</li>
+    <li><b>Reasoning models "think" in tokens.</b> They generate intermediate reasoning before the
+      final answer — you pay for those thinking tokens, but they score higher on hard problems.</li>
+    <li><b>Budget forcing.</b> The <i>S1</i> paper (Jan 2025) found that injecting the word
+      <b>"wait"</b> into a reasoning trace makes the model reflect deeper — a startlingly simple lever.<sup class="cite"><a href="https://arxiv.org/abs/2501.19393">1</a></sup></li>
+    <li><b>Frontier models hallucinate with confidence.</b> They are trained to sound <em>plausible</em>,
+      not to be <em>true</em>. Confidently wrong is the dangerous failure mode.</li>
+    <li><b>Knowledge cutoffs are real.</b> Each model only knows up to its training date; web search
+      bolted on top patches this but is <em>not</em> part of the model.</li>
+    <li><b>Supervision is mandatory.</b> Most dangerous for a junior who can't smell a wrong answer —
+      in the course's example, a model invented elaborate code instead of flagging a misnamed model.</li>
+    <li><b>Agentic AI</b> chains many model calls into autonomous multi-step work: Deep Research,
+      browser Agent Mode, and Claude Code reading a whole codebase to write runnable code.</li>
+  </ul>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "Why not always use a reasoning model?" — Because chat models are
+    faster and cheaper, and reasoning models can overthink simple tasks. You match model
+    <em>type</em> to task difficulty, the same way you matched model <em>size</em> on Day 1.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">No notes. Recall first, then check.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What turns a <b>base</b> model into a <b>chat/instruct</b> model?","options":["Adding a larger context window to the base model","RLHF — tuning on message/response pairs from human feedback","Running the base model locally through Ollama","Increasing the parameter count past one trillion"],"answer":1,"why":"Reinforcement Learning from Human Feedback trains the base model to follow instructions in system/user/assistant turns — that&#39;s what makes it a usable chat model."},
+    {"q":"Why does a <b>reasoning</b> model cost more than a chat model on the same question?","options":["It always uses a bigger context window by design","It generates extra intermediate thinking tokens you pay for","Reasoning models are only sold on premium tiers","It calls the web search API on every request"],"answer":1,"why":"Reasoning models emit a visible chain of thinking tokens before the answer; you&#39;re billed for that extra generation, which buys higher accuracy on hard tasks."},
+    {"q":"What is the safest way to describe a frontier model&#39;s relationship to truth?","options":["It is trained to be accurate above all else","It is trained to sound plausible, not necessarily to be true","It refuses to answer when uncertain","It verifies every claim against the live web"],"answer":1,"why":"Models optimize for plausible next tokens. They can be confidently wrong (hallucinate), which is why human supervision is essential."},
+    {"q":"What did the S1 paper&#39;s \"budget forcing\" trick involve?","options":["Capping the model&#39;s output length to save cost","Injecting the word \"wait\" to make it reason more deeply","Forcing the model to answer within a fixed token budget","Splitting the prompt across two reasoning models"],"answer":1,"why":"Adding \"wait\" into the reasoning trace nudges the model to reconsider and reflect further before answering — a surprisingly cheap way to buy more reasoning."},
+    {"q":"What makes Claude Code an example of <b>agentic AI</b>?","options":["It runs entirely offline with no API calls","It orchestrates many model calls to autonomously read code and act","It is a single one-shot chat completion","It only works with reasoning models, never chat models"],"answer":1,"why":"Agentic systems chain multiple LLM calls into autonomous multi-step work — reading files, deciding next steps, and writing runnable code without step-by-step human direction."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>Muennighoff et&nbsp;al., <a href="https://arxiv.org/abs/2501.19393"><i>s1: Simple test-time scaling</i></a> (2025) —
+    the "wait" / budget-forcing result. For the taxonomy, Anthropic's
+    <a href="https://www.anthropic.com/research">research notes on RLHF</a> are a trustworthy primer.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want a side-by-side of a chat vs reasoning model on the same puzzle, or a
+    deeper dive on RLHF? Say so. Terms are in the <a href="../reference/glossary.html">glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0002-day2-providers-and-endpoints.html">← Day 2</a>
+    <a href="0004-day4-transformers-and-tokens.html">Day 4 — Transformers &amp; tokens →</a>
+  </nav>
+
+</div>
+</body>
+</html>

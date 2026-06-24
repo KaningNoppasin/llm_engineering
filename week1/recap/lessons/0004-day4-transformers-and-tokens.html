@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 4 — Transformers, Tokens &amp; the Illusion of Memory</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 1 <span class="dot">●</span> Day 4 Recap</p>
+    <h1>Transformers, tokens &amp; the illusion of memory</h1>
+    <p class="subtitle">What's actually under the hood — and why every chat is stateless.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> the three ideas here — attention, tokens,
+    statelessness — explain almost every practical question you'll hit later: context limits, API
+    bills, why long chats get expensive, and why "memory" is something <em>you</em> engineer.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can explain why an LLM "remembers" nothing between calls, and count the tokens (and
+    rough cost) of any prompt with <code>tiktoken</code>.</p>
+  </div>
+
+  <h2>Architecture in three beats</h2>
+  <ul class="concepts">
+    <li><b>Transformers (2017).</b> The "T" in GPT, from Google's <i>Attention Is All You Need</i>.
+      Their superpower is <b>parallelism</b>.<sup class="cite"><a href="https://arxiv.org/abs/1706.03762">1</a></sup></li>
+    <li><b>Attention</b> is the layer that decides which earlier tokens matter most when predicting
+      the next one — letting the model weigh context instead of reading strictly left-to-right.</li>
+    <li><b>Why transformers beat LSTMs.</b> LSTMs were arguably more powerful per step but
+      <em>sequential</em> — each step waits on the last, so they can't parallelize. Transformers
+      traded some theoretical depth for massive parallel training, which let them scale on far more data.</li>
+    <li><b>Emergent intelligence.</b> Scale them up enough and predicting <em>likely</em> text starts
+      producing <em>accurate</em> text — understanding that nobody fully explains.</li>
+  </ul>
+
+  <h2>The numbers that build intuition</h2>
+  <table>
+    <thead><tr><th>Thing</th><th>Rough figure</th></tr></thead>
+    <tbody>
+      <tr><td>Parameter growth</td><td>GPT-1 117M → GPT-2 1.5B → GPT-3 175B → GPT-4 ~1.76T</td></tr>
+      <tr><td>Token ≈ words</td><td>~0.75 words per token → 1,000 tokens ≈ 750 words</td></tr>
+      <tr><td>Token ≈ characters</td><td>~4 characters per token (English)</td></tr>
+      <tr><td>Context windows</td><td>GPT-5 ~400k, Claude ~200k, Gemini 2.5 ~1M tokens</td></tr>
+      <tr><td>Cost shape</td><td>GPT-5 ~$1.25 / $10 per&nbsp;M in/out; gpt-5-nano ~$0.05 / $0.40</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Tokens, in code</h2>
+  <pre><code><span class="c-kw">import</span> tiktoken
+
+enc = tiktoken.<span class="c-fn">encoding_for_model</span>(<span class="c-str">"gpt-4.1-mini"</span>)
+tokens = enc.<span class="c-fn">encode</span>(<span class="c-str">"Hi my name is Ed"</span>)   <span class="c-com"># text  -> list of token IDs</span>
+text   = enc.<span class="c-fn">decode</span>([<span class="c-str">12194</span>])             <span class="c-com"># token ID -> text fragment</span>
+n      = <span class="c-fn">len</span>(tokens)                       <span class="c-com"># this is what you pay for</span></code></pre>
+
+  <h2>The illusion of memory</h2>
+  <p>
+    Every API call is <b>stateless</b>. The model has no memory of your last message. A chat "remembers"
+    only because <em>you resend the entire conversation</em> in the <code>messages</code> list every time.
+    That's why long conversations cost more — the model must re-read all prior tokens to predict the next one.
+  </p>
+  <pre><code>messages = [
+    {<span class="c-str">"role"</span>: <span class="c-str">"system"</span>,    <span class="c-str">"content"</span>: <span class="c-str">"You are helpful."</span>},
+    {<span class="c-str">"role"</span>: <span class="c-str">"user"</span>,      <span class="c-str">"content"</span>: <span class="c-str">"Hi, I'm Ed."</span>},
+    {<span class="c-str">"role"</span>: <span class="c-str">"assistant"</span>, <span class="c-str">"content"</span>: <span class="c-str">"Hi Ed! How can I help?"</span>},
+    {<span class="c-str">"role"</span>: <span class="c-str">"user"</span>,      <span class="c-str">"content"</span>: <span class="c-str">"What's my name?"</span>},   <span class="c-com"># only works because the</span>
+]                                                          <span class="c-com"># whole history is resent</span></code></pre>
+
+  <div class="gotcha">
+    <b>Connects forward:</b> statelessness + token cost is exactly why <b>RAG</b> (Week 5) exists —
+    you can't fit everything in the context window or afford to, so you retrieve only the relevant
+    chunks and send those.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Mix of today's facts and one callback to Day 2's "predict the next message."</p>
+  <div class="quiz" data-quiz='[
+    {"q":"Why did Transformers win over LSTMs despite LSTMs being powerful?","options":["LSTMs could not be trained on GPUs at all","Transformers parallelize; LSTMs must process tokens sequentially","Transformers have far fewer parameters to train","LSTMs cannot handle text, only images"],"answer":1,"why":"LSTMs are sequential — each step depends on the previous one — so they can&#39;t parallelize. Transformers&#39; attention runs over all positions at once, enabling training at massive scale."},
+    {"q":"You send \"Hi, I&#39;m Alice\" then later ask \"Who am I?\" — why might it say it doesn&#39;t know?","options":["The model&#39;s knowledge cutoff predates your name","Each call is stateless; you didn&#39;t resend the earlier message","Alice is not in the model&#39;s training data","tiktoken stripped the name during encoding"],"answer":1,"why":"Calls are stateless. The model only sees what&#39;s in the current messages list — if the earlier turn isn&#39;t resent, that context is simply gone."},
+    {"q":"Roughly how many words is 1,000 tokens of English?","options":["About 250 words","About 750 words","About 1,500 words","About 4,000 words"],"answer":1,"why":"The rule of thumb is ~0.75 words per token, so 1,000 tokens ≈ 750 words (and ~4 characters per token)."},
+    {"q":"What is the <b>attention</b> mechanism&#39;s job?","options":["To store the conversation between API calls","To weigh which earlier tokens matter for the next prediction","To compress the model&#39;s weights for local use","To convert tokens back into characters"],"answer":1,"why":"Attention lets the model decide which parts of the input sequence are most relevant when predicting each next token — the core transformer innovation."},
+    {"q":"Why do longer conversations cost more per turn?","options":["The model charges a flat fee that rises with time","The whole growing history is resent and re-processed each call","Longer chats automatically switch to a pricier model","Context windows shrink as the chat grows"],"answer":1,"why":"Because the model is stateless, every turn resends all prior tokens; you pay to re-process the entire accumulated context each time."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>Vaswani et&nbsp;al., <a href="https://arxiv.org/abs/1706.03762"><i>Attention Is All You Need</i></a> (2017) —
+    the transformer paper. For visual intuition, 3Blue1Brown's
+    <a href="https://www.youtube.com/watch?v=wjZofJX0v4M">"But what is a GPT?"</a> is the best primer made.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to actually run <code>tiktoken</code> on one of your own prompts and
+    price it, or unpack what a "head" of attention is? Ask. Definitions in the
+    <a href="../reference/glossary.html">glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0003-day3-model-taxonomy.html">← Day 3</a>
+    <a href="0005-day5-prompt-chaining-and-streaming.html">Day 5 — Chaining &amp; streaming →</a>
+  </nav>
+
+</div>
+</body>
+</html>

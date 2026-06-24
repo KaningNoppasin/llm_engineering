@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 1 — Your First LLM Call &amp; the Web Summarizer</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 1 <span class="dot">●</span> Day 1 Recap</p>
+    <h1>Your first LLM call &amp; the web summarizer</h1>
+    <p class="subtitle">From a model running on your laptop to a working OpenAI API pipeline.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> every LLM product you will ever build
+    is, underneath, this exact shape — build a list of messages, send them to a model,
+    read the reply. Day 1 is the atom. Master it and the rest of the course is composition.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can call a frontier model from Python and explain <em>why</em> a request is split
+    into a <b>system</b> prompt and a <b>user</b> prompt.</p>
+  </div>
+
+  <h2>The core idea</h2>
+  <p>
+    An LLM doesn't "run" inside your code — you send it text and it sends text back over an
+    API. Day 1 shows the two ways to get a model to talk to you: <b>locally</b> with
+    <a href="#">Ollama</a> (open-source models on your own machine, free, private, smaller)
+    and via the <b>cloud</b> with OpenAI's Chat Completions API (frontier models, pay-per-token,
+    far more capable). Same mental model, different muscle.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>Two places models live.</b> Ollama downloads open-source models (Gemma, Phi-3, Llama)
+      and runs them locally; OpenAI runs frontier models (GPT-5, GPT-4.1) in the cloud behind an API.</li>
+    <li><b>A request is a list of messages.</b> Each message is a dict with a <code>role</code>
+      (<code>system</code> or <code>user</code>) and <code>content</code>. The model predicts the next message.</li>
+    <li><b>System vs user prompt.</b> The <b>system</b> prompt sets the job, tone, and rules
+      ("you are a summarizer; reply in markdown"). The <b>user</b> prompt carries the actual
+      data or question for this call.</li>
+    <li><b>Secrets live in <code>.env</code>.</b> Your key (format <code>sk-proj-…</code>) goes in a
+      <code>.env</code> file that is never committed. <code>load_dotenv()</code> reads it; the
+      <code>OpenAI()</code> client picks up <code>OPENAI_API_KEY</code> automatically.</li>
+    <li><b>The toolchain.</b> <b>uv</b> (a Rust-based package manager) builds the virtual
+      environment in minutes; Cursor + a Jupyter kernel pointed at <code>.venv</code> is where you run cells.</li>
+    <li><b>Model tiers are a cost/speed dial.</b> Cheap-and-fast (gpt-5-nano / gpt-4.1-nano) for
+      simple jobs like summarizing; bigger models when you need more quality.</li>
+    <li><b>The summarizer pipeline.</b> Fetch a page's text → build system + user messages →
+      call the API → read <code>response.choices[0].message.content</code> → render as markdown.</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-com"># 1. client reads OPENAI_API_KEY from your .env automatically</span>
+<span class="c-kw">from</span> openai <span class="c-kw">import</span> OpenAI
+<span class="c-kw">from</span> dotenv <span class="c-kw">import</span> load_dotenv
+load_dotenv()
+openai = OpenAI()
+
+<span class="c-com"># 2. a request is just a list of role/content messages</span>
+messages = [
+    {<span class="c-str">"role"</span>: <span class="c-str">"system"</span>, <span class="c-str">"content"</span>: <span class="c-str">"You summarize web pages in short markdown."</span>},
+    {<span class="c-str">"role"</span>: <span class="c-str">"user"</span>,   <span class="c-str">"content"</span>: <span class="c-str">"Summarize this:\n"</span> + website_text},
+]
+
+<span class="c-com"># 3. call the model and read the reply</span>
+response = openai.chat.completions.<span class="c-fn">create</span>(
+    model=<span class="c-str">"gpt-4.1-nano"</span>,
+    messages=messages,
+)
+<span class="c-fn">print</span>(response.choices[<span class="c-str">0</span>].message.content)</code></pre>
+
+  <div class="gotcha">
+    <b>Gotchas that cost beginners an hour:</b> the file must be named exactly <code>.env</code>
+    (not <code>.env.txt</code>) and <em>saved</em> before <code>load_dotenv()</code> can see it; the
+    key must start with <code>sk-proj-</code>; and the notebook kernel must point at your
+    <code>.venv</code>, not a system Python.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Answer from memory before clicking — the retrieval effort is what makes it stick.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What is the job of the <b>system</b> prompt vs the <b>user</b> prompt?","options":["System carries the data; user sets the rules and tone","System sets the task, rules and tone; user carries the data","Both carry data; the API merges them randomly","System is for Ollama; user is for OpenAI only"],"answer":1,"why":"The system prompt frames the task/tone; the user prompt supplies the specific request or data for that call."},
+    {"q":"How does <code>OpenAI()</code> get your API key in the Day 1 setup?","options":["You paste the key directly into the create() call","It reads OPENAI_API_KEY from the loaded .env file","It downloads the key from your OpenAI dashboard","Ollama injects the key at localhost startup"],"answer":1,"why":"load_dotenv() loads .env into the environment; the client auto-reads OPENAI_API_KEY from there, so secrets never sit in code."},
+    {"q":"Where does the actual reply text live in the response object?","options":["response.message.text.value.first","response.choices[0].message.content","response.output.body.content.text","response.data[0].completion.message"],"answer":1,"why":"Chat Completions returns a list of choices; choices[0].message.content holds the model&#39;s reply text."},
+    {"q":"What does Ollama give you that the OpenAI cloud API does not?","options":["The most capable frontier models available","Local, private, free inference on your own machine","Automatic .env secret management for you","A larger context window than any cloud model"],"answer":1,"why":"Ollama runs open-source models locally — free and private, but the models are smaller and less capable than cloud frontier models."},
+    {"q":"Why pick gpt-4.1-nano (a small model) for the summarizer?","options":["It is the only model that supports markdown output","Summarizing is simple, so cheap-and-fast is the right tradeoff","Small models have larger context windows by rule","Nano models are the only ones with an API key"],"answer":1,"why":"Model tier is a cost/speed dial. Summarizing is easy, so the cheapest fast model is the sensible default — you spend capability only where you need it."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>OpenAI — <a href="https://platform.openai.com/docs/guides/text">Text generation &amp; the Chat Completions API</a>.
+    The official walkthrough of the exact <code>messages</code> / <code>roles</code> shape you used today.</p>
+  </div>
+
+  <p class="teacher">
+    <b>I'm your teacher — ask me anything.</b> Confused about why messages are a <em>list</em>,
+    what a token actually is, or how billing works? Ask in chat and I'll go deeper or build a
+    follow-up lesson. See also the <a href="../reference/glossary.html">Week 1 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <span></span>
+    <a href="0002-day2-providers-and-endpoints.html">Day 2 — Providers &amp; endpoints →</a>
+  </nav>
+
+</div>
+</body>
+</html>

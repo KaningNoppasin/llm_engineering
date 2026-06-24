@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 2 — One Client, Many Providers</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 1 <span class="dot">●</span> Day 2 Recap</p>
+    <h1>One client, many providers</h1>
+    <p class="subtitle">The endpoint under the hood, and why the same code calls OpenAI, Gemini &amp; Ollama.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> AI engineers are rarely locked to one
+    vendor. Knowing that "the API" is just an HTTP endpoint — and that everyone copied OpenAI's
+    shape — means you can swap models for cost, quality, or privacy with a one-line change.
+    That flexibility is a hireable skill.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can point the <em>same</em> OpenAI Python client at OpenAI, Google Gemini, or a local
+    Ollama model by changing only <code>base_url</code> and <code>api_key</code>.</p>
+  </div>
+
+  <h2>The big realization</h2>
+  <p>
+    The "Chat Completions API" is just an HTTP endpoint that takes a conversation and returns the
+    next message. The OpenAI <b>Python client is a thin, open-source wrapper</b> around that web
+    request — it contains no model code. Because Google, Anthropic, and Ollama all expose
+    <b>OpenAI-compatible endpoints</b>, the same client library talks to all of them.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>Chat Completions = predictive text.</b> You hand the model the conversation so far; it
+      predicts the most likely next message (the next tokens). That's the whole game.</li>
+    <li><b>Frontier vs open.</b> Frontier models (GPT-5, Claude, Gemini, Grok) are closed and paid.
+      Open models (Llama, Mistral, Qwen, Gemma, DeepSeek) ship their <em>weights</em> — though the
+      training data usually isn't public, so "open-weight" is the precise term.</li>
+    <li><b>The client is just HTTP.</b> The OpenAI library wraps a <code>POST</code> to
+      <code>/v1/chat/completions</code>. You could send the raw request yourself with <code>requests</code>.</li>
+    <li><b>OpenAI-compatible endpoints.</b> Swap <code>base_url</code> + <code>api_key</code> and the
+      identical code hits Gemini or a local Ollama server.</li>
+    <li><b>Three ways to use a model.</b> A packaged product (ChatGPT), a cloud API call, or local
+      inference (Ollama / Hugging Face).</li>
+    <li><b>Distillation</b> is how small models get smart cheaply: a big model generates synthetic
+      training data to "teach" a small one. DeepSeek R1 was trained for roughly <b>$4M</b> using
+      such efficiency tricks.</li>
+  </ul>
+
+  <h2>The same call, three providers</h2>
+  <pre><code><span class="c-kw">from</span> openai <span class="c-kw">import</span> OpenAI
+
+<span class="c-com"># OpenAI (default base_url)</span>
+client = OpenAI()
+
+<span class="c-com"># Google Gemini — same client, different endpoint + key</span>
+gemini = OpenAI(
+    base_url=<span class="c-str">"https://generativelanguage.googleapis.com/v1beta/openai/"</span>,
+    api_key=GOOGLE_API_KEY,
+)
+
+<span class="c-com"># Local Ollama — runs on your machine, api_key is a placeholder</span>
+ollama = OpenAI(base_url=<span class="c-str">"http://localhost:11434/v1"</span>, api_key=<span class="c-str">"ollama"</span>)
+
+<span class="c-com"># identical call shape for all three:</span>
+gemini.chat.completions.<span class="c-fn">create</span>(model=<span class="c-str">"gemini-2.5-pro"</span>, messages=messages)</code></pre>
+
+  <p>And the raw HTTP the client hides from you — useful to have seen once:</p>
+  <pre><code>headers = {<span class="c-str">"Authorization"</span>: <span class="c-str">f"Bearer {api_key}"</span>, <span class="c-str">"Content-Type"</span>: <span class="c-str">"application/json"</span>}
+payload = {<span class="c-str">"model"</span>: <span class="c-str">"gpt-5-nano"</span>, <span class="c-str">"messages"</span>: messages}
+requests.<span class="c-fn">post</span>(<span class="c-str">"https://api.openai.com/v1/chat/completions"</span>, headers=headers, json=payload)</code></pre>
+
+  <div class="gotcha">
+    <b>The 8-week arc (where you are heading):</b> Wk1 Chat Completions → Wk2 frontier &amp;
+    multimodal → Wk3 deep open-source → Wk4 model selection → Wk5 RAG → Wk6 fine-tuning &amp; data
+    → Wk7 fine-tune open-source → Wk8 an agentic platform. Day 2 is the foundation the whole tower
+    sits on.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Interleaved with a Day 1 idea — that mixing is deliberate; it strengthens recall.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"Why can the OpenAI Python client call Google Gemini?","options":["Google licenses OpenAI&#39;s proprietary client code","Gemini exposes an OpenAI-compatible endpoint; you just change base_url","The client auto-translates between every vendor&#39;s format","Gemini calls are silently routed through OpenAI servers"],"answer":1,"why":"Providers implement the same Chat Completions request shape, so swapping base_url + api_key is enough — no special client needed."},
+    {"q":"What is the OpenAI Python client library, technically?","options":["A proprietary engine that runs the model locally","A thin open-source wrapper around an HTTP POST request","A database of cached model responses","A compiler that turns prompts into model weights"],"answer":1,"why":"It contains no model code — it just builds and sends an HTTP request to /v1/chat/completions and parses the JSON reply."},
+    {"q":"What does the Chat Completions API fundamentally do?","options":["Searches the web and returns ranked links","Predicts the most likely next message given the conversation","Stores your conversation so the model remembers it","Translates code between programming languages"],"answer":1,"why":"It is predictive text at scale: given the conversation so far, it returns the most likely next message (tokens)."},
+    {"q":"\"Open-weight\" is more precise than \"open-source\" for models like Llama because…","options":["The weights are secret but the code is public","The weights ship publicly but the training data usually does not","It means the model only runs on open hardware","There is no real difference between the two terms"],"answer":1,"why":"You get the trained weights to download and run, but the full training data and recipe are typically not released — hence open-weight."},
+    {"q":"How did DeepSeek reach frontier-ish quality for around $4M?","options":["By renting more GPUs than OpenAI","Through efficiency tricks and distillation from larger models","By using only proprietary closed data","By skipping training and copying GPT-4 weights"],"answer":1,"why":"Distillation (a big model generating synthetic training data for a smaller one) plus training efficiencies cut the cost dramatically vs. $100M+ frontier runs."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>OpenAI — <a href="https://platform.openai.com/docs/api-reference/chat">Chat Completions API reference</a>,
+    and <a href="https://github.com/ollama/ollama/blob/main/docs/openai.md">Ollama's OpenAI-compatibility docs</a>
+    showing the <code>localhost:11434/v1</code> endpoint you used.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to see the raw <code>requests</code> call return the same JSON as the
+    client, or compare a Gemini vs Ollama reply on the same prompt? Ask and we'll run it.
+    See the <a href="../reference/glossary.html">glossary</a> for every term above.
+  </p>
+
+  <nav class="nav">
+    <a href="0001-day1-first-api-call.html">← Day 1</a>
+    <a href="0003-day3-model-taxonomy.html">Day 3 — Model taxonomy →</a>
+  </nav>
+
+</div>
+</body>
+</html>

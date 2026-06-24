@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 1 Glossary — LLM Engineering</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 1 <span class="dot">●</span> Reference</p>
+    <h1>Week 1 glossary</h1>
+    <p class="subtitle">The compressed vocabulary. Print it, pin it, reuse the terms exactly.</p>
+  </header>
+
+  <table>
+    <thead><tr><th>Term</th><th>Meaning</th><th>Day</th></tr></thead>
+    <tbody>
+      <tr><td><b>Chat Completions API</b></td><td>The endpoint that takes a conversation (list of messages) and predicts the next message. The core of Week 1.</td><td>1–2</td></tr>
+      <tr><td><b>System prompt</b></td><td>Message that sets the model's task, rules, and tone for the call.</td><td>1</td></tr>
+      <tr><td><b>User prompt</b></td><td>Message carrying the actual request or data for this call.</td><td>1</td></tr>
+      <tr><td><b>Assistant message</b></td><td>The model's reply; included in history to give later turns context.</td><td>4</td></tr>
+      <tr><td><b><code>.env</code></b></td><td>Untracked file holding secrets (<code>OPENAI_API_KEY</code>); read by <code>load_dotenv()</code>.</td><td>1</td></tr>
+      <tr><td><b>uv</b></td><td>Fast Rust-based Python package/venv manager used to set up the project.</td><td>1</td></tr>
+      <tr><td><b>Ollama</b></td><td>Tool to download &amp; run open-source models locally; exposes an OpenAI-compatible endpoint at <code>localhost:11434/v1</code>.</td><td>1–2</td></tr>
+      <tr><td><b>base_url</b></td><td>The endpoint the OpenAI client targets; change it to call Gemini, Ollama, etc.</td><td>2</td></tr>
+      <tr><td><b>Frontier model</b></td><td>Closed, paid, top-capability model (GPT-5, Claude, Gemini, Grok).</td><td>2–3</td></tr>
+      <tr><td><b>Open-weight model</b></td><td>Model whose trained weights are public (Llama, Mistral, Qwen, Gemma, DeepSeek); training data usually isn't.</td><td>2</td></tr>
+      <tr><td><b>Distillation</b></td><td>Training a small model on synthetic data from a large one to compress capability cheaply.</td><td>2</td></tr>
+      <tr><td><b>Base model</b></td><td>Raw next-token predictor, not instruction-tuned; a starting point for fine-tuning.</td><td>3</td></tr>
+      <tr><td><b>Chat / instruct model</b></td><td>Base model tuned via RLHF to follow message-based instructions.</td><td>3</td></tr>
+      <tr><td><b>Reasoning model</b></td><td>Emits a thinking trace before the answer; better on hard problems, slower/pricier.</td><td>3</td></tr>
+      <tr><td><b>Hybrid model</b></td><td>Decides per query how much to reason (GPT-5, Gemini 2.5 Pro).</td><td>3</td></tr>
+      <tr><td><b>RLHF</b></td><td>Reinforcement Learning from Human Feedback — turns a base model into a chat model.</td><td>3</td></tr>
+      <tr><td><b>Budget forcing</b></td><td>Injecting "wait" into a reasoning trace to make the model reason longer (S1 paper, 2025).</td><td>3</td></tr>
+      <tr><td><b>Hallucination</b></td><td>Confident, plausible-sounding but false output; models optimize plausibility, not truth.</td><td>3</td></tr>
+      <tr><td><b>Knowledge cutoff</b></td><td>The training date past which the model knows nothing without external search.</td><td>3</td></tr>
+      <tr><td><b>Agentic AI</b></td><td>Many chained model calls doing autonomous multi-step work (Deep Research, Claude Code).</td><td>3</td></tr>
+      <tr><td><b>Transformer</b></td><td>2017 architecture ("Attention Is All You Need"); the T in GPT. Parallelizable.</td><td>4</td></tr>
+      <tr><td><b>Attention</b></td><td>Layer that weighs which earlier tokens matter for predicting the next one.</td><td>4</td></tr>
+      <tr><td><b>LSTM</b></td><td>Older sequential architecture transformers replaced; couldn't parallelize.</td><td>4</td></tr>
+      <tr><td><b>Parameters</b></td><td>Learnable weights. GPT-1 117M → GPT-3 175B → GPT-4 ~1.76T.</td><td>4</td></tr>
+      <tr><td><b>Token</b></td><td>Chunk of text (~4 chars / ~0.75 words). The unit you're billed in.</td><td>4</td></tr>
+      <tr><td><b>tiktoken</b></td><td>OpenAI's tokenizer library; <code>encode</code>/<code>decode</code> text ↔ token IDs.</td><td>4</td></tr>
+      <tr><td><b>Context window</b></td><td>Max tokens a model accepts as input (GPT-5 ~400k, Claude ~200k, Gemini ~1M).</td><td>4</td></tr>
+      <tr><td><b>Illusion of memory</b></td><td>Calls are stateless; "memory" exists only because you resend the full history.</td><td>4</td></tr>
+      <tr><td><b>Prompt chaining</b></td><td>Feeding one call's output into the next, with logic between, to build a product.</td><td>5</td></tr>
+      <tr><td><b>One-shot / multi-shot</b></td><td>Giving one (or several) example(s) of the desired output in the prompt.</td><td>5</td></tr>
+      <tr><td><b><code>response_format</code></b></td><td><code>{"type":"json_object"}</code> forces valid-JSON generation for reliable parsing.</td><td>5</td></tr>
+      <tr><td><b>Streaming</b></td><td><code>stream=True</code> yields <code>delta.content</code> chunks token-by-token (SSE).</td><td>5</td></tr>
+    </tbody>
+  </table>
+
+  <p class="teacher">
+    <b>This is your reference doc — it outlives the lessons.</b> If a term ever feels fuzzy, ask me to
+    re-teach just that row. Back to <a href="../lessons/0001-day1-first-api-call.html">Day 1</a>.
+  </p>
+
+</div>
+</body>
+</html>

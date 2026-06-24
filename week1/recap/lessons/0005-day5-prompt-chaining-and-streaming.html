@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day 5 — Prompt Chaining, JSON &amp; Streaming</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 1 <span class="dot">●</span> Day 5 Recap</p>
+    <h1>Prompt chaining, JSON &amp; streaming</h1>
+    <p class="subtitle">Wiring multiple model calls into a real product: the brochure generator.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> this is the first day you build something that
+    looks like a <em>product</em>, not a demo. Chaining calls, forcing structured output, and
+    streaming a response are the exact patterns every LLM app ships with. This is portfolio material.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can chain two model calls — one returning <b>JSON</b> you parse in Python, one
+    <b>streaming</b> text to the screen — into a single working tool.</p>
+  </div>
+
+  <h2>The brochure generator, end to end</h2>
+  <p>
+    Goal: point at a company's homepage, get back a polished brochure. One ChatGPT prompt can't do it
+    well, so you <b>chain</b>: call&nbsp;1 picks the relevant links as structured JSON; Python filters and
+    fetches them; call&nbsp;2 writes the brochure from that content, <b>streamed</b> token-by-token.
+  </p>
+
+  <h3>Call 1 — get structured links as JSON</h3>
+  <pre><code>response = openai.chat.completions.<span class="c-fn">create</span>(
+    model=<span class="c-str">"gpt-5-nano"</span>,
+    messages=[
+        {<span class="c-str">"role"</span>: <span class="c-str">"system"</span>, <span class="c-str">"content"</span>: link_system_prompt},   <span class="c-com"># shows a JSON example (one-shot)</span>
+        {<span class="c-str">"role"</span>: <span class="c-str">"user"</span>,   <span class="c-str">"content"</span>: <span class="c-fn">get_links_user_prompt</span>(url)},
+    ],
+    response_format={<span class="c-str">"type"</span>: <span class="c-str">"json_object"</span>},    <span class="c-com"># force valid JSON at inference</span>
+)
+links = json.<span class="c-fn">loads</span>(response.choices[<span class="c-str">0</span>].message.content)   <span class="c-com"># now it&#39;s a Python dict</span></code></pre>
+
+  <h3>Call 2 — write the brochure, streamed</h3>
+  <pre><code>stream = openai.chat.completions.<span class="c-fn">create</span>(
+    model=<span class="c-str">"gpt-4.1-mini"</span>,
+    messages=[...],
+    stream=<span class="c-str">True</span>,                       <span class="c-com"># return chunks as they&#39;re generated</span>
+)
+<span class="c-kw">for</span> chunk <span class="c-kw">in</span> stream:
+    piece = chunk.choices[<span class="c-str">0</span>].delta.content <span class="c-kw">or</span> <span class="c-str">""</span>
+    <span class="c-fn">print</span>(piece, end=<span class="c-str">""</span>)       <span class="c-com"># typewriter effect</span></code></pre>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>Prompt chaining.</b> Feed one call's output into the next, with Python logic in between.
+      It's how you build specialized products instead of one giant prompt.</li>
+    <li><b>JSON works because the model was trained on tons of it.</b> Asking for JSON is far more
+      reliable than ad-hoc "use bullet points" instructions — the structure is familiar to the model.</li>
+    <li><b>One-shot / multi-shot prompting.</b> Put one example of the desired output in the prompt
+      (one-shot); add more for harder formats (multi-shot). Examples beat descriptions.</li>
+    <li><b><code>response_format={"type": "json_object"}</code></b> constrains generation so only tokens
+      forming valid JSON are allowed — guaranteed-parseable output, even though the model doesn't
+      "understand" JSON semantics.</li>
+    <li><b>Streaming</b> with <code>stream=True</code> yields <code>delta.content</code> chunks
+      (Server-Sent Events) so the user sees output immediately instead of waiting for the whole reply.</li>
+    <li><b>The business lens.</b> Wrapping model calls in real logic — scraping, filtering, assembling —
+      is what turns a chatbot into a vertical product (recruiting brochure, investor one-pager, …).</li>
+  </ul>
+
+  <div class="gotcha">
+    <b>Model selection in action:</b> Day 5 uses <em>two different models on purpose</em> — cheap
+    gpt-5-nano for the mechanical link-extraction, balanced gpt-4.1-mini for the quality-sensitive
+    writing. That's the Day 1 cost/quality dial and Day 3 taxonomy applied to one pipeline.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Final quiz of the week — it interleaves Days 1, 3 and 5. That mixing is the point.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What does <code>response_format={\"type\":\"json_object\"}</code> actually do?","options":["Parses the reply into a Python dict for you","Constrains generation so only valid-JSON tokens are emitted","Asks the model politely to try returning JSON","Switches the model to a JSON-only reasoning mode"],"answer":1,"why":"It restricts token selection at inference time to tokens that keep the output valid JSON — guaranteeing parseable structure regardless of the model&#39;s understanding."},
+    {"q":"What is <b>prompt chaining</b>?","options":["Sending one very long prompt with many questions","Using one call&#39;s output as input to the next, with logic between","Retrying the same prompt until it succeeds","Linking your API key across multiple providers"],"answer":1,"why":"Chaining sequences multiple model calls — often with Python logic in between — so each step builds a specialized product instead of one monolithic prompt."},
+    {"q":"Why ask for JSON instead of \"just give me bullet points\"?","options":["JSON responses are billed at a lower token rate","Models are trained on huge amounts of JSON, so it&#39;s far more reliable","Bullet points are not supported by the API","JSON disables hallucination entirely"],"answer":1,"why":"LLMs have seen enormous quantities of JSON in training, so the structure is familiar and predictable — much more reliable than informal formatting instructions."},
+    {"q":"What does <code>stream=True</code> change about the response?","options":["It returns one final message after a longer wait","It yields chunks (delta.content) as tokens are generated","It caches the response for the next identical call","It forces the model to reason before answering"],"answer":1,"why":"Streaming returns incremental chunks via Server-Sent Events; you read chunk.choices[0].delta.content to display output token-by-token in real time."},
+    {"q":"Why does the brochure pipeline use gpt-5-nano <em>and</em> gpt-4.1-mini?","options":["Two models are required to enable streaming","Cheap model for mechanical link-picking, stronger model for the writing","Each provider only allows one call per model per minute","Nano models cannot produce JSON output"],"answer":1,"why":"It applies the cost/quality dial: spend little on the easy structured task (links) and more on the quality-sensitive task (the brochure prose)."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>OpenAI — <a href="https://platform.openai.com/docs/guides/structured-outputs">Structured Outputs</a>
+    (the modern successor to <code>json_object</code>) and
+    <a href="https://platform.openai.com/docs/guides/streaming-responses">Streaming</a>.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to extend the brochure generator (add a translation step? a tone
+    selector?), or compare <code>json_object</code> vs the newer Structured Outputs schema? Let's build it.
+    See the <a href="../reference/glossary.html">glossary</a> and the
+    <a href="0001-day1-first-api-call.html">Week 1 lessons index</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0004-day4-transformers-and-tokens.html">← Day 4</a>
+    <a href="../reference/glossary.html">Week 1 glossary →</a>
+  </nav>
+
+</div>
+</body>
+</html>
