@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W2 Day 2 — UIs Without Front-End Skills</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 2 <span class="dot">●</span> Day 2 Recap</p>
+    <h1>UIs without front-end skills</h1>
+    <p class="subtitle">Gradio: wrap a Python function in a web UI, and stream into it.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> a backend engineer who can put a shareable UI
+    in front of an LLM in 5 lines ships demos that get noticed. Gradio is how you turn a notebook
+    into something a hiring manager (or stakeholder) can click.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can wrap any function in <code>gr.Interface(...).launch()</code> and make its output
+    <b>stream</b> by turning the function into a generator.</p>
+  </div>
+
+  <h2>What Gradio is</h2>
+  <p>
+    <b>Gradio</b> is an open-source Python library (owned by Hugging Face) that builds a web UI from a
+    Python function — no JavaScript, no HTML. You hand it a <em>callback</em> and the input/output
+    component types; it spins up a local web server and a React front end.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b><code>gr.Interface(fn, inputs, outputs)</code></b> is the core: a function plus the shapes
+      of its inputs and outputs. <code>.launch()</code> serves it on a local port (~7860).</li>
+    <li><b>You pass the function by reference</b> (<code>fn=shout</code>, not <code>shout()</code>) so
+      Gradio decides when to call it with the user's input.</li>
+    <li><b>Components</b> describe the I/O: <code>gr.Textbox(label=…, lines=N)</code> in,
+      <code>gr.Markdown()</code> out to render bold/bullets from an LLM nicely.</li>
+    <li><b><code>share=True</code></b> publishes a public tunnelled URL (valid ~1 week) that calls back
+      to your machine — great for demos, but it can trip corporate firewalls.</li>
+    <li><b>Auth &amp; convenience.</b> <code>auth=("user","pass")</code> adds a login screen;
+      <code>inbrowser=True</code> auto-opens the tab.</li>
+    <li><b>Streaming is automatic for generators.</b> If your callback <code>yield</code>s, Gradio
+      detects it and progressively refreshes the output as chunks arrive.</li>
+  </ul>
+
+  <h2>The code shapes to memorize</h2>
+  <pre><code><span class="c-kw">import</span> gradio <span class="c-kw">as</span> gr
+
+<span class="c-com"># minimal interface</span>
+<span class="c-kw">def</span> <span class="c-fn">shout</span>(text):
+    <span class="c-kw">return</span> text.<span class="c-fn">upper</span>()
+
+gr.<span class="c-fn">Interface</span>(fn=shout, inputs=<span class="c-str">"textbox"</span>, outputs=<span class="c-str">"textbox"</span>).<span class="c-fn">launch</span>()
+
+<span class="c-com"># streaming: make the callback a GENERATOR and yield cumulative text</span>
+<span class="c-kw">def</span> <span class="c-fn">stream_gpt</span>(prompt):
+    stream = openai.chat.completions.<span class="c-fn">create</span>(model=<span class="c-str">"gpt-4.1-mini"</span>,
+                                              messages=[...], stream=<span class="c-str">True</span>)
+    result = <span class="c-str">""</span>
+    <span class="c-kw">for</span> chunk <span class="c-kw">in</span> stream:
+        result += chunk.choices[<span class="c-str">0</span>].delta.content <span class="c-kw">or</span> <span class="c-str">""</span>
+        <span class="c-kw">yield</span> result     <span class="c-com"># Gradio refreshes the display each yield</span>
+
+gr.<span class="c-fn">Interface</span>(fn=stream_gpt, inputs=<span class="c-str">"textbox"</span>, outputs=gr.<span class="c-fn">Markdown</span>()).<span class="c-fn">launch</span>()</code></pre>
+
+  <div class="gotcha">
+    <b>Gotcha:</b> for streaming you must <code>yield</code> the <em>accumulated</em> string, not each
+    new fragment — Gradio replaces the output with whatever you yield, so yield the growing result.
+    And pass <code>fn=stream_gpt</code> (reference), never <code>fn=stream_gpt()</code>.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">One callback to Week 1's streaming idea — notice it's the same <code>delta.content</code>.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"In Gradio, how do you make a callback stream its output progressively?","options":["Pass stream=True to the launch() method call","Write the callback as a generator that yields cumulative text","Wrap the function in a gr.Streaming() container","Set outputs=gr.Markdown() and it streams by default"],"answer":1,"why":"If the callback is a generator using yield, Gradio auto-detects it and refreshes the output with each yielded value."},
+    {"q":"Why do you write <code>fn=shout</code> rather than <code>fn=shout()</code>?","options":["Calling it would run faster on the server","You pass the function by reference so Gradio calls it later","Gradio cannot read a function&#39;s return type otherwise","The parentheses are only needed for streaming callbacks"],"answer":1,"why":"You pass the function by reference (a callback) so Gradio invokes it with user input at the right time; calling it would run it once immediately."},
+    {"q":"What does <code>share=True</code> do on <code>.launch()</code>?","options":["Saves the interface permanently to Hugging Face","Creates a public tunnelled URL that lasts about a week","Shares your API key with the Gradio servers","Enables multiple users to edit the code live"],"answer":1,"why":"share=True publishes a temporary public URL (about one week) that tunnels back to your running machine — handy for demos."},
+    {"q":"Which output component renders an LLM&#39;s bold/bullets nicely?","options":["gr.Textbox() with the lines parameter set","gr.Markdown() to format the response text","gr.JSON() to structure the output cleanly","gr.Label() for highlighted text display"],"answer":1,"why":"gr.Markdown() renders markdown formatting (bold, bullets, equations) — cleaner than a plain textbox for LLM replies."},
+    {"q":"(Week 1 recall) The <code>delta.content</code> you accumulate in stream_gpt comes from…","options":["A Gradio-specific streaming wrapper object","The chunks returned when the API call sets stream=True","The system prompt being echoed back in pieces","tiktoken splitting the reply into tokens for you"],"answer":1,"why":"Setting stream=True on the chat completion yields chunks; each chunk.choices[0].delta.content is the next piece — the same mechanism from Week 1 Day 5."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>Gradio — <a href="https://www.gradio.app/guides/quickstart">Quickstart</a> and the
+    <a href="https://www.gradio.app/guides/creating-a-chatbot-fast">streaming guide</a>. The docs are
+    short and example-first; build along with them.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to add auth, multiple inputs, or a model-picker dropdown to your
+    interface? Ask and we'll extend it. See the <a href="../reference/glossary.html">Week 2 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0006-day1-multi-provider-apis.html">← Day 1</a>
+    <a href="0008-day3-chat-and-prompting.html">Day 3 — Chat &amp; prompting →</a>
+  </nav>
+
+</div>
+</body>
+</html>

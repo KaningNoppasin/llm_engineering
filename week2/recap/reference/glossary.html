@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 2 Glossary — LLM Engineering</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 2 <span class="dot">●</span> Reference</p>
+    <h1>Week 2 glossary</h1>
+    <p class="subtitle">The applied-week vocabulary: providers, Gradio, tools, multimodal. Print &amp; pin.</p>
+  </header>
+
+  <p class="note">New terms from Week 2. For Week 1 fundamentals (tokens, context window, RLHF, …)
+  see the <a href="../../../week1/recap/reference/glossary.html">Week 1 glossary</a>.</p>
+
+  <table>
+    <thead><tr><th>Term</th><th>Meaning</th><th>Day</th></tr></thead>
+    <tbody>
+      <tr><td><b>Native SDK</b></td><td>A vendor's own client (e.g. <code>anthropic</code>) with its own request shape, vs. the OpenAI-compatible route.</td><td>1</td></tr>
+      <tr><td><b>Anthropic messages API</b></td><td><code>client.messages.create()</code>; <code>max_tokens</code> required, <code>system</code> is a separate param, read <code>content[0].text</code>.</td><td>1</td></tr>
+      <tr><td><b>reasoning_effort</b></td><td>GPT-5 param (<code>minimal/low/medium/high</code>) tuning inference-time thinking, independent of model size.</td><td>1</td></tr>
+      <tr><td><b>Inference-time scaling</b></td><td>Spending more compute at answer time (reasoning) rather than training a bigger model.</td><td>1</td></tr>
+      <tr><td><b>OpenRouter</b></td><td>Aggregator: one key/endpoint for 100+ models, addressed as <code>provider/model-name</code>.</td><td>1, 5</td></tr>
+      <tr><td><b>LangChain</b></td><td>Heavyweight framework for composing complex LLM workflows.</td><td>1</td></tr>
+      <tr><td><b>LiteLLM</b></td><td>Thin multi-provider wrapper exposing per-call token usage and cost.</td><td>1</td></tr>
+      <tr><td><b>Prompt caching</b></td><td>Reusing cached prompt prefixes to cut input cost; put static content first.</td><td>1</td></tr>
+      <tr><td><b>Gradio</b></td><td>Python library (Hugging Face) that builds a web UI from a function — no JS.</td><td>2</td></tr>
+      <tr><td><b>gr.Interface</b></td><td><code>(fn, inputs, outputs).launch()</code> — wraps one function in a UI.</td><td>2</td></tr>
+      <tr><td><b>Callback</b></td><td>The function you pass <em>by reference</em> for Gradio to invoke on user input.</td><td>2</td></tr>
+      <tr><td><b>Component</b></td><td>An I/O element: <code>gr.Textbox</code>, <code>gr.Markdown</code>, <code>gr.Image</code>, <code>gr.Audio</code>…</td><td>2, 5</td></tr>
+      <tr><td><b>share=True</b></td><td>Publishes a temporary (~1 week) public tunnelled URL to your running app.</td><td>2</td></tr>
+      <tr><td><b>Generator streaming</b></td><td>A callback that <code>yield</code>s cumulative text; Gradio refreshes output per yield.</td><td>2, 3</td></tr>
+      <tr><td><b>gr.ChatInterface</b></td><td>Prebuilt chat UI; your <code>chat(message, history)</code> callback supplies replies.</td><td>3</td></tr>
+      <tr><td><b>messages recipe</b></td><td>Every turn: <code>[system] + history + [user]</code> before calling the model.</td><td>3</td></tr>
+      <tr><td><b>Multi-shot prompting</b></td><td>Putting several example Q&amp;A pairs in the prompt to steer behavior.</td><td>3</td></tr>
+      <tr><td><b>RAG (primitive)</b></td><td>Injecting query-relevant context into the prompt at inference; toy version uses keyword checks.</td><td>3</td></tr>
+      <tr><td><b>Tool / function calling</b></td><td>Model emits a structured request to run your function; you run it and return the result.</td><td>4</td></tr>
+      <tr><td><b>Tool schema</b></td><td>JSON describing a tool: <code>name</code>, <code>description</code>, <code>parameters</code>, <code>required</code>.</td><td>4</td></tr>
+      <tr><td><b>finish_reason</b></td><td><code>"tool_calls"</code> means the reply is a tool request, not text.</td><td>4</td></tr>
+      <tr><td><b>role: "tool"</b></td><td>Message type carrying a tool result, tagged with a matching <code>tool_call_id</code>.</td><td>4</td></tr>
+      <tr><td><b>tool_call_id</b></td><td>ID linking a tool result back to the specific call the model made.</td><td>4</td></tr>
+      <tr><td><b>DALL·E 3</b></td><td>Image-generation model; <code>response_format="b64_json"</code> returns base64 image data.</td><td>5</td></tr>
+      <tr><td><b>TTS</b></td><td>Text-to-speech (<code>gpt-4o-mini-tts</code>, voices like <code>onyx</code>) returning audio bytes.</td><td>5</td></tr>
+      <tr><td><b>gr.Blocks</b></td><td>Custom layouts (<code>Row</code>/<code>Column</code>) with event chaining via <code>.submit().then()</code>.</td><td>5</td></tr>
+      <tr><td><b>Agentic AI</b></td><td>A goal decomposed into multiple coordinated tool/LLM calls with autonomy.</td><td>5</td></tr>
+    </tbody>
+  </table>
+
+  <p class="teacher">
+    <b>Your reference doc — it outlives the lessons.</b> Fuzzy on a row? Ask me to re-teach just that one.
+    Back to <a href="../lessons/0006-day1-multi-provider-apis.html">Week 2 Day 1</a>.
+  </p>
+
+</div>
+</body>
+</html>

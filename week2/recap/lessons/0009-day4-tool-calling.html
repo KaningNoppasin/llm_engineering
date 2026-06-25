@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W2 Day 4 — Tool Calling (No Magic)</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 2 <span class="dot">●</span> Day 4 Recap</p>
+    <h1>Tool calling — no magic, just prompts</h1>
+    <p class="subtitle">The model asks <em>you</em> to run a function. You run it and hand back the result.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> tool calling is the single most important
+    pattern in modern AI engineering — it's how LLMs touch databases, APIs, and the real world.
+    Every "agent" is built on this round-trip. Nail it and you can build genuinely useful systems.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can explain the tool-calling round-trip end to end, and write the
+    <code>while finish_reason == "tool_calls"</code> loop that powers it.</p>
+  </div>
+
+  <h2>The demystification</h2>
+  <p>
+    The LLM never runs your code. When it "calls a tool," it just emits a structured message saying
+    <em>"please run <code>get_ticket_price("London")</code> and tell me the result."</em> Your code runs
+    the function, appends the result to the conversation, and calls the model <b>again</b>. The model
+    then writes the final answer using that result. No magic — a two-step prompt exchange.
+  </p>
+
+  <h2>The round-trip, step by step</h2>
+  <ul class="concepts">
+    <li><b>1. Describe your tools as JSON schema</b> and pass them via <code>tools=</code>. Each has a
+      <code>name</code>, <code>description</code> (the model reads this to decide when to call it), and
+      <code>parameters</code> with <code>required</code> fields.</li>
+    <li><b>2. Detect the request.</b> If <code>response.choices[0].finish_reason == "tool_calls"</code>,
+      the reply is a function request, not text.</li>
+    <li><b>3. Run the function.</b> Parse <code>tool_call.function.arguments</code> (a JSON string) and
+      call your real Python function.</li>
+    <li><b>4. Append the result</b> as a message with <code>role: "tool"</code> and the matching
+      <code>tool_call_id</code> — the ID correlates the result to the specific request.</li>
+    <li><b>5. Call the model again</b> with the expanded history. It now answers in natural language.</li>
+    <li><b>Multiple &amp; sequential tools:</b> loop over <code>message.tool_calls</code> for several at
+      once, and use <code>while</code> (not <code>if</code>) so the model can chain more calls after
+      seeing results.</li>
+    <li><b>Real backends:</b> swap the mock lookup for SQLite (with parameterized <code>?</code> queries)
+      and the model can query a real database.</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-com"># 1. tool schema</span>
+tools = [{
+    <span class="c-str">"type"</span>: <span class="c-str">"function"</span>,
+    <span class="c-str">"function"</span>: {
+        <span class="c-str">"name"</span>: <span class="c-str">"get_ticket_price"</span>,
+        <span class="c-str">"description"</span>: <span class="c-str">"Get the round-trip price to a destination city"</span>,
+        <span class="c-str">"parameters"</span>: {
+            <span class="c-str">"type"</span>: <span class="c-str">"object"</span>,
+            <span class="c-str">"properties"</span>: {<span class="c-str">"destination_city"</span>: {<span class="c-str">"type"</span>: <span class="c-str">"string"</span>}},
+            <span class="c-str">"required"</span>: [<span class="c-str">"destination_city"</span>],
+        },
+    },
+}]
+
+<span class="c-com"># 2-5. the round-trip loop</span>
+response = openai.chat.completions.<span class="c-fn">create</span>(model=MODEL, messages=messages, tools=tools)
+<span class="c-kw">while</span> response.choices[<span class="c-str">0</span>].finish_reason == <span class="c-str">"tool_calls"</span>:
+    msg = response.choices[<span class="c-str">0</span>].message
+    messages.<span class="c-fn">append</span>(msg)                          <span class="c-com"># the assistant's tool request</span>
+    <span class="c-kw">for</span> call <span class="c-kw">in</span> msg.tool_calls:
+        args = json.<span class="c-fn">loads</span>(call.function.arguments)  <span class="c-com"># arguments are a JSON string</span>
+        result = <span class="c-fn">get_ticket_price</span>(args[<span class="c-str">"destination_city"</span>])
+        messages.<span class="c-fn">append</span>({<span class="c-str">"role"</span>: <span class="c-str">"tool"</span>, <span class="c-str">"content"</span>: result,
+                         <span class="c-str">"tool_call_id"</span>: call.id})   <span class="c-com"># must match the request id</span>
+    response = openai.chat.completions.<span class="c-fn">create</span>(model=MODEL, messages=messages, tools=tools)
+<span class="c-kw">return</span> response.choices[<span class="c-str">0</span>].message.content</code></pre>
+
+  <div class="gotcha">
+    <b>The four things people get wrong:</b> (1) forgetting to append the assistant's tool-request
+    message <em>before</em> the tool result; (2) omitting <code>tool_call_id</code>; (3) using
+    <code>if</code> instead of <code>while</code> (breaks multi-step chains); (4) forgetting to re-pass
+    <code>tools=</code> on the second call.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">The core of the week — answer all five from memory before checking.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"When an LLM \"calls a tool,\" what actually happens?","options":["The model executes your Python function itself","It emits a structured request; your code runs the function","The provider runs the function on its own servers","The tool runs only if you set autonomous mode on"],"answer":1,"why":"The model never runs code — it returns a structured tool request. Your code executes the function and feeds the result back in a second call."},
+    {"q":"What signals that a response is a tool request rather than an answer?","options":["The content field contains the word TOOL","finish_reason equals \"tool_calls\" on the choice","The response has no choices array at all","The usage field reports zero output tokens"],"answer":1,"why":"finish_reason == \"tool_calls\" tells you the model wants a function run; you execute it and re-call the model."},
+    {"q":"Why must the tool-result message include a <code>tool_call_id</code>?","options":["To authenticate your request to the provider","So the model correlates the result to its specific call","To bill the call to the right API key","To tell Gradio which component to update"],"answer":1,"why":"The id links your result back to the exact tool call the model made — essential when several calls are in flight."},
+    {"q":"Why use <code>while finish_reason == \"tool_calls\"</code> instead of <code>if</code>?","options":["while runs faster than if in Python loops","So the model can chain more tool calls after seeing results","if cannot read the finish_reason attribute","while automatically retries on network errors"],"answer":1,"why":"After receiving a tool result the model may want another tool; a while loop keeps servicing requests until it returns plain text."},
+    {"q":"(Week 1 recall) The tool <code>description</code> field matters because…","options":["The API rejects tools that lack a description","The model reads it to decide when to call the tool","It is shown to the end user in the Gradio UI","It sets the maximum tokens the tool may return"],"answer":1,"why":"The model chooses tools from their natural-language descriptions — clear descriptions are prompt engineering, the Week 1 skill applied to tools."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>OpenAI — <a href="https://platform.openai.com/docs/guides/function-calling">Function calling guide</a>.
+    Read it once end to end; it mirrors today's round-trip exactly.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to add a second tool (book a flight?) or wire the SQLite version so the
+    model queries a real table? Ask and we'll build it. Terms in the
+    <a href="../reference/glossary.html">Week 2 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0008-day3-chat-and-prompting.html">← Day 3</a>
+    <a href="0010-day5-multimodal-agents.html">Day 5 — Multimodal agents →</a>
+  </nav>
+
+</div>
+</body>
+</html>

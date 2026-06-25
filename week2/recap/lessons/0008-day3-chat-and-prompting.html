@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W2 Day 3 — Chatbots &amp; Prompt Steering</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 2 <span class="dot">●</span> Day 3 Recap</p>
+    <h1>Chatbots &amp; prompt steering</h1>
+    <p class="subtitle">gr.ChatInterface, the messages list, multi-shot, and RAG's first glimpse.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> a chatbot is the default shape of most LLM
+    products. Knowing exactly how history flows through the <code>messages</code> list — and how to
+    steer behavior with examples and injected context — is bread-and-butter AI engineering.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can build a streaming chatbot in one line of UI code, and steer it with multi-shot
+    examples and context injected into the system prompt.</p>
+  </div>
+
+  <h2>The chatbot loop</h2>
+  <p>
+    <b><code>gr.ChatInterface</code></b> gives you a full chat UI for free. Your job is one function,
+    <code>chat(message, history)</code>: Gradio hands you the new message and the prior turns, and you
+    rebuild the <code>messages</code> list the LLM expects, then stream the reply.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>The messages list is always the same recipe:</b>
+      <code>[system] + history + [user]</code>. Gradio supplies <code>history</code>; <em>you</em>
+      prepend the system message and append the new user turn.</li>
+    <li><b>History is a list of role/content dicts.</b> With <code>type="messages"</code>, Gradio passes
+      OpenAI-style <code>{"role": ..., "content": ...}</code> entries (sometimes with extra metadata
+      keys you may need to strip for other providers).</li>
+    <li><b>The system message lives in your code</b>, not the UI — Gradio doesn't know about it, so you
+      must prepend it every call.</li>
+    <li><b>Multi-shot prompting</b> steers behavior by putting example Q&amp;A pairs in the system
+      prompt (one example = one-shot, several = multi-shot). Examples beat adjectives.</li>
+    <li><b>RAG, the primitive version.</b> Conditionally inject relevant facts into the system prompt
+      based on the user's message (e.g. detect "belt" → add store-policy text). That's retrieval-
+      augmented generation in its simplest, hand-rolled form.</li>
+    <li><b>Streaming again:</b> <code>yield</code> the accumulating response instead of
+      <code>return</code> — same generator trick as Day 2.</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-kw">def</span> <span class="c-fn">chat</span>(message, history):
+    <span class="c-com"># history is [{"role":..., "content":...}, ...] from Gradio</span>
+    messages = [{<span class="c-str">"role"</span>: <span class="c-str">"system"</span>, <span class="c-str">"content"</span>: system_message}] \
+             + history \
+             + [{<span class="c-str">"role"</span>: <span class="c-str">"user"</span>, <span class="c-str">"content"</span>: message}]
+
+    stream = openai.chat.completions.<span class="c-fn">create</span>(model=MODEL, messages=messages, stream=<span class="c-str">True</span>)
+    response = <span class="c-str">""</span>
+    <span class="c-kw">for</span> chunk <span class="c-kw">in</span> stream:
+        response += chunk.choices[<span class="c-str">0</span>].delta.content <span class="c-kw">or</span> <span class="c-str">""</span>
+        <span class="c-kw">yield</span> response
+
+gr.<span class="c-fn">ChatInterface</span>(fn=chat, type=<span class="c-str">"messages"</span>).<span class="c-fn">launch</span>()
+
+<span class="c-com"># primitive RAG: inject context conditionally before the call</span>
+<span class="c-kw">if</span> <span class="c-str">"belt"</span> <span class="c-kw">in</span> message.<span class="c-fn">lower</span>():
+    system_message += <span class="c-str">" The store does not sell belts; suggest alternatives."</span></code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "What is RAG, simply?" — Fetch the facts relevant to this query and
+    put them in the prompt before generating. Today's keyword-injection is the toy version; Week 5
+    replaces the <code>if</code> with a vector search over an embedded knowledge base.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Interleaves Week 1's prompting ideas with today's chat mechanics.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What is the standard recipe for the messages list in a chatbot turn?","options":["Just the latest user message on its own","system message, then history, then the new user message","history first, then system, then nothing else","Only the system message plus a summary of history"],"answer":1,"why":"You build [system] + history + [user] every call: prepend the system message, include the prior turns, append the new user message."},
+    {"q":"Who provides the system message to <code>gr.ChatInterface</code>?","options":["Gradio injects it from the UI automatically","Your code prepends it; Gradio does not know about it","The user types it into a hidden settings field","The model generates its own system message"],"answer":1,"why":"Gradio only passes message and history — the system message lives in your code and must be prepended on every call."},
+    {"q":"What is multi-shot prompting?","options":["Sending the same prompt several times for averaging","Putting several example Q&amp;A pairs in the prompt to steer behavior","Calling several different models and merging replies","Splitting one long prompt across multiple requests"],"answer":1,"why":"Multi-shot means including multiple worked examples in the prompt so the model imitates the demonstrated pattern (one example = one-shot)."},
+    {"q":"The day&#39;s \"primitive RAG\" technique works by…","options":["Fine-tuning the model on store data overnight","Injecting relevant context into the system prompt at query time","Caching previous answers and replaying them","Switching to a larger model when context is needed"],"answer":1,"why":"It conditionally adds relevant facts to the system prompt before generating — retrieval-augmented generation, hand-rolled with an if-statement."},
+    {"q":"(Week 1 recall) Why must you resend the whole history each turn?","options":["Gradio deletes the model&#39;s memory after each reply","API calls are stateless; the model only sees what you send","The model charges less when history is included","History resets the model&#39;s temperature each call"],"answer":1,"why":"Calls are stateless (Week 1 Day 4): the model has no memory, so the rebuilt messages list is the only context it gets."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>Gradio — <a href="https://www.gradio.app/guides/creating-a-chatbot-fast">Creating a chatbot fast</a>
+    (the <code>ChatInterface</code> + <code>type="messages"</code> pattern). For the real RAG, peek ahead
+    to your Week 5 materials.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to turn the keyword-injection RAG into a tiny embedding search, or add
+    multi-shot examples that fix a specific misbehavior? Ask. See the
+    <a href="../reference/glossary.html">Week 2 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0007-day2-gradio-uis.html">← Day 2</a>
+    <a href="0009-day4-tool-calling.html">Day 4 — Tool calling →</a>
+  </nav>
+
+</div>
+</body>
+</html>

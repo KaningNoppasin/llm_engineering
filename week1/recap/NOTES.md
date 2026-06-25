@@ -20,4 +20,16 @@
 ## Open threads / good next sessions
 - A **Week 1 mixed-day exam** (cold recall across all 5 days) after a day or two of spacing.
 - Hands-on: actually run `tiktoken` pricing and extend the brochure generator.
-- When ready: start the **Week 2** recap (frontier models & multimodal).
+
+## Progress
+- **Week 1 recap: done** (lessons 0001–0005, `week1/recap/`).
+- **Week 2 recap: done** (lessons 0006–0010, `week2/recap/`) — applied/product week:
+  multi-provider APIs, Gradio, chatbots, tool calling, multimodal+agentic. Assets copied
+  into `week2/recap/assets/` so each week is self-contained; see
+  [week2 learning record](../../week2/recap/learning-records/0002-week2-applied.md).
+- **Next:** after spacing, a mixed Week 1+2 exam; then the **Week 3** recap.
+
+## Quiz authoring rule (learned the hard way)
+- Inside `data-quiz='...'` JSON, every apostrophe MUST be the entity `&#39;` — a raw `'`
+  closes the single-quoted attribute early and a doubled `''` doesn't decode. Validate with
+  a browser-accurate check (no raw `'` inside any quiz block) before shipping.

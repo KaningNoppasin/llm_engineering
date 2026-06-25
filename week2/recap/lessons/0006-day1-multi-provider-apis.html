@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W2 Day 1 — Many Providers, One Conversation</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 2 <span class="dot">●</span> Day 1 Recap</p>
+    <h1>Many providers, one conversation</h1>
+    <p class="subtitle">OpenAI, Claude, Gemini &amp; OpenRouter — and the params that actually differ.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> real AI teams mix providers — cheapest for
+    bulk, smartest for hard calls, local for private. Knowing each SDK's quirks (and the unifying
+    layers) is the difference between "I used the OpenAI tutorial" and "I architect model choice."
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can call Claude's native API (noting how it differs from OpenAI), dial GPT-5's
+    <code>reasoning_effort</code>, and run two models in conversation with each other.</p>
+  </div>
+
+  <h2>The provider landscape</h2>
+  <p>
+    Week 1 showed one client hitting many <em>OpenAI-compatible</em> endpoints. Week 2 goes deeper:
+    each frontier vendor also has a <b>native SDK</b> with its own shape, and aggregators like
+    <b>OpenRouter</b> put 100+ models behind a single key.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>OpenAI's client is the lingua franca.</b> Point it at Anthropic, Gemini, DeepSeek, Groq
+      via <code>base_url</code> — the increasingly standard way to stay provider-agnostic.</li>
+    <li><b>Anthropic's native API differs.</b> <code>client.messages.create(...)</code> needs
+      <code>max_tokens</code> (mandatory), takes <code>system</code> as a <em>separate parameter</em>
+      (not a message), and you read <code>response.content[0].text</code> — not <code>choices[0]</code>.</li>
+    <li><b>reasoning_effort is inference-time scaling.</b> On GPT-5 (<code>minimal/low/medium/high</code>)
+      it buys more "thinking" without a bigger model — a separate lever from model size.</li>
+    <li><b>OpenRouter = one key, many models.</b> Address models as <code>provider/model-name</code>
+      (e.g. <code>z-ai/glm-4.5</code>) through one OpenAI-compatible endpoint.</li>
+    <li><b>LangChain vs LiteLLM.</b> LangChain is a heavyweight abstraction for complex workflows;
+      <b>LiteLLM</b> is a thin wrapper that exposes per-call token usage and cost. Reach for LiteLLM
+      when you want simplicity and visibility.</li>
+    <li><b>Prompt caching cuts cost.</b> OpenAI caches automatically (~much cheaper repeat input);
+      Anthropic is explicit. Put <em>static</em> content first, <em>variable</em> content last.</li>
+    <li><b>Multi-model conversations</b> are just two message lists: each turn you rebuild the history
+      with roles flipped so each model "sees" the other as the user.</li>
+  </ul>
+
+  <h2>The code shapes to memorize</h2>
+  <pre><code><span class="c-com"># Anthropic NATIVE client — note the differences from OpenAI</span>
+<span class="c-kw">from</span> anthropic <span class="c-kw">import</span> Anthropic
+claude = Anthropic()
+response = claude.messages.<span class="c-fn">create</span>(
+    model=<span class="c-str">"claude-sonnet-4-5-20250929"</span>,
+    system=<span class="c-str">"You are concise."</span>,      <span class="c-com"># system is a SEPARATE param</span>
+    messages=[{<span class="c-str">"role"</span>: <span class="c-str">"user"</span>, <span class="c-str">"content"</span>: <span class="c-str">"Hi"</span>}],
+    max_tokens=<span class="c-str">200</span>,                  <span class="c-com"># REQUIRED on Anthropic</span>
+)
+<span class="c-fn">print</span>(response.content[<span class="c-str">0</span>].text)   <span class="c-com"># not choices[0].message.content</span>
+
+<span class="c-com"># GPT-5 reasoning effort (inference-time scaling)</span>
+openai.chat.completions.<span class="c-fn">create</span>(model=<span class="c-str">"gpt-5-mini"</span>, messages=msgs, reasoning_effort=<span class="c-str">"low"</span>)
+
+<span class="c-com"># OpenRouter — one key, provider/model addressing</span>
+router = OpenAI(base_url=<span class="c-str">"https://openrouter.ai/api/v1"</span>, api_key=key)
+router.chat.completions.<span class="c-fn">create</span>(model=<span class="c-str">"z-ai/glm-4.5"</span>, messages=msgs)</code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "How do you keep code portable across providers?" — Use the
+    OpenAI client with swappable <code>base_url</code>, or a wrapper like LiteLLM/OpenRouter; isolate
+    the few native-SDK differences (Anthropic's <code>max_tokens</code>, separate <code>system</code>,
+    <code>content[0].text</code>) behind one function.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Two questions reach back to Week 1 — that interleaving is deliberate.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"How does Anthropic&#39;s native messages API differ from OpenAI&#39;s chat completions?","options":["It returns choices[0].message.content like OpenAI does","max_tokens is required and system is a separate parameter","It cannot accept a system instruction at all","It uses GET requests instead of POST requests"],"answer":1,"why":"Anthropic requires max_tokens, takes system as its own parameter (not a message), and you read response.content[0].text."},
+    {"q":"What does GPT-5&#39;s <code>reasoning_effort</code> parameter control?","options":["How many output tokens the model may return","Inference-time thinking depth, separate from model size","Which provider the request is routed to","The temperature and randomness of sampling"],"answer":1,"why":"reasoning_effort (minimal/low/medium/high) is inference-time scaling — more deliberate reasoning without changing the model size."},
+    {"q":"When would you pick LiteLLM over LangChain?","options":["When you need the heaviest abstraction available","When you want simplicity plus per-call cost and token visibility","When you must avoid calling any cloud provider","When you only ever use a single fixed model"],"answer":1,"why":"LiteLLM is a thin multi-provider wrapper that surfaces token usage and cost per call; LangChain is heavier, suited to complex multi-step workflows."},
+    {"q":"(Week 1 recall) Why can the OpenAI client also call Gemini or DeepSeek?","options":["Those providers resell OpenAI&#39;s proprietary models","They expose OpenAI-compatible endpoints; you swap base_url","The client secretly proxies through OpenAI servers","Only the paid OpenAI tier unlocks other vendors"],"answer":1,"why":"Providers implement the same Chat Completions request shape, so changing base_url and api_key is enough — a Week 1 idea extended here."},
+    {"q":"(Week 1 recall) A reasoning model costs more than a chat model because…","options":["It always uses a larger context window by design","It generates extra thinking tokens that you pay for","It is only sold on premium enterprise plans","It calls a web search on every single request"],"answer":1,"why":"Reasoning (and higher reasoning_effort) generates intermediate thinking tokens you are billed for — the same idea reasoning_effort exposes as a dial."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>Anthropic — <a href="https://docs.anthropic.com/en/api/messages">Messages API reference</a>
+    (see the required <code>max_tokens</code> and separate <code>system</code>), and
+    <a href="https://openrouter.ai/docs">OpenRouter docs</a> for unified model access.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to actually run a GPT-vs-Claude debate loop, or wrap the three
+    providers behind one portable function? Say so. Terms live in the
+    <a href="../reference/glossary.html">Week 2 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <span></span>
+    <a href="0007-day2-gradio-uis.html">Day 2 — Gradio UIs →</a>
+  </nav>
+
+</div>
+</body>
+</html>

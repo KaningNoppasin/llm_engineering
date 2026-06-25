@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W2 Day 5 — Multimodal &amp; Agentic Assistants</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 2 <span class="dot">●</span> Day 5 Recap</p>
+    <h1>Multimodal &amp; agentic assistants</h1>
+    <p class="subtitle">Images, speech, and custom layouts — the whole week stitched into one app.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> the capstone — you combine tools, image
+    generation, and audio into a single assistant with a custom UI. This is exactly the kind of
+    end-to-end build that becomes a portfolio centerpiece and an interview talking point.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can generate an image with DALL·E 3 and speech with TTS, and lay out a multi-component app
+    with <code>gr.Blocks</code> — then explain what makes it "agentic."</p>
+  </div>
+
+  <h2>Three new capabilities</h2>
+  <ul class="concepts">
+    <li><b>Image generation (DALL·E 3).</b> <code>openai.images.generate(...)</code> with
+      <code>response_format="b64_json"</code> returns a base64 image you decode in Python — no file I/O.
+      Note: images are pricey (~$0.04 each) vs. text calls.</li>
+    <li><b>Text-to-speech.</b> <code>openai.audio.speech.create(model="gpt-4o-mini-tts", voice="onyx", …)</code>
+      returns audio bytes you can play back (voices include <code>onyx</code>, <code>alloy</code>, <code>coral</code>).</li>
+    <li><b><code>gr.Blocks</code> for custom layouts.</b> Where <code>gr.Interface</code> is one
+      function in/out and <code>gr.ChatInterface</code> is a prebuilt chat, <b>Blocks</b> lets you place
+      components in <code>Row</code>/<code>Column</code> containers and wire events with
+      <code>.submit(...).then(...)</code>.</li>
+    <li><b>Agentic AI</b> = a task broken into multiple coordinated LLM/tool calls with some autonomy.
+      Hallmarks: breaking work into steps, using tools, persistence/memory, planning, and the model
+      itself deciding the next action.</li>
+    <li><b>It all composes:</b> the airline assistant calls a price tool, then generates a city image,
+      then speaks the reply — multiple modalities triggered from one conversation.</li>
+    <li><b>OpenRouter (extra)</b> lets you compare frontier and open models behind one key — handy for
+      picking the right model per task (a Week 4 theme previewed).</li>
+  </ul>
+
+  <h2>The code shapes to memorize</h2>
+  <pre><code><span class="c-com"># DALL-E 3 image -> base64 (decode and show, no file needed)</span>
+img = openai.images.<span class="c-fn">generate</span>(model=<span class="c-str">"dall-e-3"</span>,
+                            prompt=<span class="c-str">f"Pop-art image of {city}"</span>,
+                            size=<span class="c-str">"1024x1024"</span>, response_format=<span class="c-str">"b64_json"</span>)
+b64 = img.data[<span class="c-str">0</span>].b64_json
+
+<span class="c-com"># text-to-speech -> audio bytes</span>
+audio = openai.audio.speech.<span class="c-fn">create</span>(model=<span class="c-str">"gpt-4o-mini-tts"</span>,
+                                    voice=<span class="c-str">"onyx"</span>, input=text).content
+
+<span class="c-com"># gr.Blocks: custom layout + event wiring</span>
+<span class="c-kw">with</span> gr.<span class="c-fn">Blocks</span>() <span class="c-kw">as</span> ui:
+    <span class="c-kw">with</span> gr.<span class="c-fn">Row</span>():
+        chatbot = gr.<span class="c-fn">Chatbot</span>(height=<span class="c-str">500</span>)
+        image   = gr.<span class="c-fn">Image</span>(height=<span class="c-str">500</span>)
+    entry = gr.<span class="c-fn">Textbox</span>()
+    entry.<span class="c-fn">submit</span>(add_message, [entry, chatbot], [entry, chatbot]) \
+         .<span class="c-fn">then</span>(chat, chatbot, [chatbot, image])   <span class="c-com"># chain events</span>
+ui.<span class="c-fn">launch</span>()</code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "What makes something an <em>agent</em> vs a chatbot?" — A chatbot
+    answers one turn; an agent decomposes a goal into steps, calls tools, and decides the next action
+    itself. Today's assistant is the first real agent you've built — tools (Day 4) + modalities + a
+    loop that lets the model drive.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Final Week 2 quiz — it interleaves Days 2, 4 and 5.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What does <code>response_format=\"b64_json\"</code> give you from DALL·E 3?","options":["A hosted URL that expires after one hour","A base64 image string you decode directly in Python","A PNG file written to your working directory","A prompt-enhanced description of the image"],"answer":1,"why":"It returns the image as base64-encoded JSON, so you decode and display it in memory without any file I/O."},
+    {"q":"When do you reach for <code>gr.Blocks</code> over <code>gr.Interface</code>?","options":["Whenever you only have one input and output","When you need custom multi-component layouts and event chaining","Only when the app must run without any callbacks","When you want Gradio to pick the layout for you"],"answer":1,"why":"gr.Blocks gives Row/Column layout control and lets you wire events (.submit().then()); gr.Interface is the simple single-function case."},
+    {"q":"Which best describes \"agentic AI\" from today?","options":["A single large model with a huge context window","A task broken into multiple coordinated tool/LLM calls with autonomy","Any chatbot that streams its responses token by token","A model fine-tuned specifically on agent transcripts"],"answer":1,"why":"Agentic systems decompose a goal into steps, use tools, and let the model decide the next action — more than a single one-shot reply."},
+    {"q":"(Day 4 recall) The agent triggers an image and audio after which step?","options":["After the user uploads a file to the chat","After the model calls a tool and gets its result","After Gradio refreshes the streamed output","Before any message is added to the history"],"answer":1,"why":"The model calls the price tool (Day 4 round-trip), and once it has the result the app also generates the city image and speaks the reply."},
+    {"q":"(Day 2 recall) The custom Blocks app still streams chat because…","options":["gr.Blocks streams everything by default automatically","the chat callback is a generator that yields, as before","Blocks disables streaming to keep layouts stable","the image component forces the chat to stream too"],"answer":1,"why":"Streaming is unchanged: the callback yields cumulative text (Day 2 generator trick) regardless of whether you use Interface or Blocks."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>OpenAI — <a href="https://platform.openai.com/docs/guides/image-generation">Image generation</a>
+    and <a href="https://platform.openai.com/docs/guides/text-to-speech">Text-to-speech</a>; Gradio —
+    <a href="https://www.gradio.app/guides/blocks-and-event-listeners">Blocks &amp; event listeners</a>.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to extend the assistant — add a booking tool, a voice picker, or deploy
+    it to Hugging Face Spaces? Ask. Everything is summarized in the
+    <a href="../reference/glossary.html">Week 2 glossary</a>, and you can revisit the
+    <a href="0006-day1-multi-provider-apis.html">Week 2 index of lessons</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0009-day4-tool-calling.html">← Day 4</a>
+    <a href="../reference/glossary.html">Week 2 glossary →</a>
+  </nav>
+
+</div>
+</body>
+</html>
