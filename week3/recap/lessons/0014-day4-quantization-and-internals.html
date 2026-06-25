@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W3 Day 4 — Quantization &amp; Model Internals</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 3 <span class="dot">●</span> Day 4 Recap</p>
+    <h1>Quantization &amp; model internals</h1>
+    <p class="subtitle">The low-level API, 4-bit weights, and what's actually inside a decoder layer.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> quantization is what lets a billion-parameter
+    model fit on a free GPU — the single most practical trick for running open models on a budget.
+    And being able to describe a decoder layer in an interview proves you understand what you deploy.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can load an open LLM in 4-bit with <code>BitsAndBytesConfig</code>, generate from it with
+    the low-level API, and name the parts of a decoder layer.</p>
+  </div>
+
+  <h2>Two big ideas</h2>
+  <p>
+    <b>1. The low-level API.</b> Below <code>pipeline()</code> sits
+    <code>AutoModelForCausalLM</code> + the tokenizer, giving you control over loading, quantization,
+    and generation. <em>"Causal LM"</em> = predicts the next token from prior tokens only.<br>
+    <b>2. Quantization.</b> Store each weight in 4 bits instead of 16/32, cutting memory ~4× with
+    little quality loss. The analogy: a dimmer switch with 16 discrete levels instead of smooth.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b><code>BitsAndBytesConfig</code></b> sets up 4-bit loading: <code>load_in_4bit=True</code>,
+      <code>nf4</code> quant type (assumes normally-distributed weights), bfloat16 compute,
+      double-quant for extra savings.</li>
+    <li><b><code>device_map="auto"</code></b> places the model across available GPU/CPU memory for you.</li>
+    <li><b>The generate flow:</b> <code>apply_chat_template</code> → move tokens to <code>cuda</code>
+      → <code>model.generate(..., max_new_tokens=N)</code> → <code>tokenizer.decode</code>.</li>
+    <li><b>Inside the model:</b> an <b>embedding</b> layer maps each of 128,256 vocab IDs to a dense
+      vector (2,048 dims in Llama 3.2-1B), then a stack of <b>decoder layers</b>.</li>
+    <li><b>A decoder layer</b> = <b>self-attention</b> (query/key/value/output projections) + an
+      <b>MLP</b> (up-project 2048→8000, gate, down-project 8000→2048) + layer norm.</li>
+    <li><b>Non-linearity is mandatory.</b> Without an activation (e.g. SiLU/ReLU) in the MLP, stacked
+      linear layers collapse into a single linear map — every parameter would be redundant.</li>
+    <li><b>The LM head</b> is the final layer: 2,048 dims → 128,256 logits, a probability over the next token.</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-kw">from</span> transformers <span class="c-kw">import</span> AutoModelForCausalLM, BitsAndBytesConfig
+<span class="c-kw">import</span> torch
+
+bnb = <span class="c-fn">BitsAndBytesConfig</span>(
+    load_in_4bit=<span class="c-str">True</span>,
+    bnb_4bit_quant_type=<span class="c-str">"nf4"</span>,
+    bnb_4bit_compute_dtype=torch.bfloat16,
+    bnb_4bit_use_double_quant=<span class="c-str">True</span>,
+)
+
+model = AutoModelForCausalLM.<span class="c-fn">from_pretrained</span>(
+    <span class="c-str">"meta-llama/Llama-3.2-1B-Instruct"</span>,
+    quantization_config=bnb, device_map=<span class="c-str">"auto"</span>,
+)
+
+inputs = tok.<span class="c-fn">apply_chat_template</span>(messages, return_tensors=<span class="c-str">"pt"</span>).<span class="c-fn">to</span>(<span class="c-str">"cuda"</span>)
+out = model.<span class="c-fn">generate</span>(inputs, max_new_tokens=<span class="c-str">80</span>)
+<span class="c-fn">print</span>(tok.<span class="c-fn">decode</span>(out[<span class="c-str">0</span>]))</code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "Why does 4-bit barely hurt quality?" — Weights are roughly
+    normally distributed, so <code>nf4</code> spends its 16 levels where most weights actually live.
+    You trade a tiny bit of precision for ~4× the model on the same GPU.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Interleaves Week 1's transformer/attention idea with today's internals.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What does 4-bit quantization trade, and what does it save?","options":["Speed for accuracy; it saves training time","A little weight precision; it saves ~4x memory","Context length for quality; it saves tokens","Vocabulary size for speed; it saves disk space"],"answer":1,"why":"Storing weights in 4 bits instead of 16 cuts memory roughly 4x with minimal quality loss — letting big models fit on small GPUs."},
+    {"q":"What does \"causal\" mean in <code>AutoModelForCausalLM</code>?","options":["It explains the cause of each prediction","It predicts the next token from prior tokens only","It runs the model backwards from the answer","It requires a causal graph as extra input"],"answer":1,"why":"Causal (autoregressive) LM predicts each token using only earlier tokens — a causal mask prevents it from peeking ahead."},
+    {"q":"Why must an MLP include a non-linearity like SiLU or ReLU?","options":["To make the model train faster on a GPU","Else stacked linear layers collapse into one map","To convert token IDs into embeddings correctly","To enforce the 4-bit quantization levels"],"answer":1,"why":"Without non-linearity, composing linear layers is still just one linear transformation — the activation is what makes depth (and each parameter) meaningful."},
+    {"q":"What does the final LM head produce?","options":["The embedding vector for the input token","Logits over the whole vocabulary for the next token","The attention weights of the last layer","A compressed summary of the conversation"],"answer":1,"why":"The LM head maps the hidden state (e.g. 2,048 dims) to 128,256 logits — a probability distribution over the next token."},
+    {"q":"(Week 1 recall) Self-attention in each decoder layer exists to…","options":["store the conversation between separate API calls","weigh which earlier tokens matter for the next one","quantize the weights down to 4-bit precision","convert token IDs back into readable text"],"answer":1,"why":"Attention (Week 1 Day 4) decides which earlier tokens are relevant — here you saw its query/key/value/output projections inside the real decoder layer."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>Hugging Face — <a href="https://huggingface.co/docs/transformers/main/en/quantization/bitsandbytes">bitsandbytes quantization guide</a>.
+    For the architecture, the <a href="https://huggingface.co/docs/transformers/model_doc/llama">Llama model docs</a>
+    list every layer you inspected.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to print a real model's architecture and walk the layers together, or
+    compare 4-bit vs full-precision memory on a card? Ask. See the
+    <a href="../reference/glossary.html">Week 3 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0013-day3-tokenizers.html">← Day 3</a>
+    <a href="0015-day5-audio-to-minutes.html">Day 5 — Audio → minutes →</a>
+  </nav>
+
+</div>
+</body>
+</html>

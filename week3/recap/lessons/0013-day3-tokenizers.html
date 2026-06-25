@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W3 Day 3 — Tokenizers &amp; Chat Templates</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 3 <span class="dot">●</span> Day 3 Recap</p>
+    <h1>Tokenizers &amp; chat templates</h1>
+    <p class="subtitle">Every model has its own private dictionary — and its own way to format a chat.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> when you run open models yourself, <em>you</em>
+    own tokenization. Get the tokenizer or chat template wrong and the model outputs garbage. This is
+    the layer Weeks 1–2 hid from you — and a favorite interview probe.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can load a model's tokenizer, encode/decode text, and format a conversation with
+    <code>apply_chat_template</code> the exact way that model was trained to expect.</p>
+  </div>
+
+  <h2>The core idea</h2>
+  <p>
+    A <b>tokenizer</b> converts text ⇄ token IDs (numbers the model actually consumes). Crucially,
+    <b>every model has its own tokenizer and vocabulary</b> — the same word maps to different IDs in
+    Llama vs Phi-4 vs Qwen. Decode Llama's IDs with Phi's tokenizer and you get nonsense.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b><code>AutoTokenizer.from_pretrained(model)</code></b> loads the right tokenizer for any model
+      — you never pick it manually.</li>
+    <li><b><code>encode</code> / <code>decode</code></b> are inverses: text → token IDs → text.</li>
+    <li><b>Special tokens</b> are reserved IDs that don't map to language: <code>BOS</code> (begin),
+      <code>EOS</code> (end), and role/header markers. They tell the model about <em>structure</em>.</li>
+    <li><b>They work because of training, not magic.</b> The model learned to treat these tokens
+      consistently from billions of examples — nothing in the architecture hard-codes them.</li>
+    <li><b><code>apply_chat_template(messages, …)</code></b> turns an OpenAI-style message list into the
+      single token string that model expects, inserting the right special tokens automatically.</li>
+    <li><b>Templates differ per model.</b> Llama injects a knowledge-cutoff date and header markers;
+      Phi-4 is simpler; DeepSeek orders things differently. Use each model's own template.</li>
+    <li><b>Vocab size is a tradeoff.</b> Llama 3.1 has <b>128,256</b> tokens (128,000 + 256 reserved).
+      Bigger vocab → rare words in fewer tokens; code models (Qwen/Starcoder) tune vocab for syntax.</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-kw">from</span> transformers <span class="c-kw">import</span> AutoTokenizer
+
+tok = AutoTokenizer.<span class="c-fn">from_pretrained</span>(<span class="c-str">"meta-llama/Llama-3.1-8B-Instruct"</span>)
+
+ids  = tok.<span class="c-fn">encode</span>(<span class="c-str">"Tokenizers convert text to numbers"</span>)   <span class="c-com"># text  -> [ids]</span>
+text = tok.<span class="c-fn">decode</span>(ids)                                    <span class="c-com"># [ids] -> text</span>
+
+<span class="c-com"># format a conversation the way THIS model was trained to read it</span>
+messages = [
+    {<span class="c-str">"role"</span>: <span class="c-str">"system"</span>, <span class="c-str">"content"</span>: <span class="c-str">"You are helpful."</span>},
+    {<span class="c-str">"role"</span>: <span class="c-str">"user"</span>,   <span class="c-str">"content"</span>: <span class="c-str">"Tell a joke."</span>},
+]
+prompt = tok.<span class="c-fn">apply_chat_template</span>(messages, tokenize=<span class="c-str">False</span>,
+                                     add_generation_prompt=<span class="c-str">True</span>)</code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> <code>add_generation_prompt=True</code> appends the assistant
+    header so the model knows it's <em>its</em> turn to speak. Forget it and the model may try to
+    continue the user's turn instead. The chat template is why you can't just paste raw text into a
+    chat model and expect good results.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Interleaves Week 1's token idea with today's per-model tokenizers.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What happens if you decode Llama&#39;s token IDs with Phi-4&#39;s tokenizer?","options":["The same text, since token IDs are universal","Garbage, because each model has its own vocab mapping","An error that halts the decode call immediately","Correct text but with different capitalization"],"answer":1,"why":"Token IDs are model-specific. Each tokenizer has its own vocabulary, so IDs from one are meaningless to another."},
+    {"q":"What does <code>apply_chat_template</code> actually do?","options":["Trains the model on your conversation history","Formats messages into the model&#39;s expected token string","Translates the conversation into another language","Compresses the messages to fit the context window"],"answer":1,"why":"It converts an OpenAI-style message list into the single string (with special tokens) that this specific model was trained to read."},
+    {"q":"Why do special tokens like BOS/EOS work at all?","options":["The transformer architecture hard-codes their meaning","The model learned to treat them consistently in training","They are decoded by a separate rules engine","Hugging Face injects their behavior at runtime"],"answer":1,"why":"Nothing in the architecture is magic — the model learned consistent patterns for these reserved tokens from billions of training examples."},
+    {"q":"What does a larger vocabulary (e.g. Llama&#39;s 128,256) buy you?","options":["Faster training on smaller datasets always","Rare words encoded in fewer tokens on average","Guaranteed higher accuracy on every task","A larger context window automatically"],"answer":1,"why":"A bigger vocab can represent rare words/sub-words directly, so text needs fewer tokens; small vocabs split words into more pieces."},
+    {"q":"(Week 1 recall) A token is roughly…","options":["exactly one English word every time","about 0.75 of a word / ~4 characters","always a single character of text","one full sentence of context"],"answer":1,"why":"The Week 1 rule of thumb: ~0.75 words per token (~4 characters). Tokenizers split text into these sub-word chunks."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>Hugging Face — <a href="https://huggingface.co/docs/transformers/main/en/chat_templating">Chat templating guide</a>
+    and the <a href="https://huggingface.co/docs/transformers/main_classes/tokenizer">Tokenizer reference</a>.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to compare how three models tokenize the same sentence, or see a raw
+    Llama chat template with its special tokens? Ask. See the
+    <a href="../reference/glossary.html">Week 3 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0012-day2-pipelines.html">← Day 2</a>
+    <a href="0014-day4-quantization-and-internals.html">Day 4 — Quantization &amp; internals →</a>
+  </nav>
+
+</div>
+</body>
+</html>

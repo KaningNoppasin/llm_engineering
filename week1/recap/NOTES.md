@@ -27,7 +27,10 @@
   multi-provider APIs, Gradio, chatbots, tool calling, multimodal+agentic. Assets copied
   into `week2/recap/assets/` so each week is self-contained; see
   [week2 learning record](../../week2/recap/learning-records/0002-week2-applied.md).
-- **Next:** after spacing, a mixed Week 1+2 exam; then the **Week 3** recap.
+- **Week 3 recap: done** (lessons 0011–0015, `week3/recap/`) — open-source/Hugging Face week:
+  HF + Colab GPUs, pipelines, tokenizers, quantization + model internals, audio→minutes capstone.
+  See [week3 learning record](../../week3/recap/learning-records/0003-week3-open-source.md).
+- **Next:** after spacing, a mixed Week 1–3 exam; then the **Week 4** recap.
 
 ## Quiz authoring rule (learned the hard way)
 - Inside `data-quiz='...'` JSON, every apostrophe MUST be the entity `&#39;` — a raw `'`

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W3 Day 2 — Hugging Face Pipelines</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 3 <span class="dot">●</span> Day 2 Recap</p>
+    <h1>Hugging Face pipelines</h1>
+    <p class="subtitle">One high-level call for any task — sentiment, NER, Q&amp;A, images, audio.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> not every problem needs a frontier LLM. A small,
+    task-specific open model behind a <code>pipeline()</code> is often cheaper, faster, and good
+    enough. Knowing when to reach for one is real engineering judgment.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can run any of a dozen AI tasks in two lines with <code>pipeline(task)</code>, on a GPU,
+    without touching tokenizers or post-processing.</p>
+  </div>
+
+  <h2>What a pipeline is</h2>
+  <p>
+    A <b><code>pipeline</code></b> is Hugging Face's <em>high-level</em> inference API. It bundles three
+    steps you'd otherwise do by hand — <b>tokenize → run model → post-process</b> — behind one object.
+    You pick a task, optionally a model, and call it with raw input.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>Task-based.</b> One interface, many tasks: <code>sentiment-analysis</code>, <code>ner</code>,
+      <code>question-answering</code>, <code>summarization</code>, <code>translation</code>,
+      <code>zero-shot-classification</code>, <code>text-generation</code>, image &amp; audio generation.</li>
+    <li><b>Model optional.</b> Omit the model and HF picks a sensible default; name one
+      (e.g. <code>nlptown/bert-base-multilingual-uncased-sentiment</code>) for better results.</li>
+    <li><b>It hides the plumbing.</b> Tokenization, padding, attention masks, decoding the logits —
+      all handled. You pass text/image/audio, you get structured output back.</li>
+    <li><b><code>device="cuda"</code></b> runs it on the GPU (<code>"mps"</code> on Apple Silicon, CPU
+      by default). On a Colab T4 that's a big speedup.</li>
+    <li><b>Two abstraction levels.</b> Pipelines are the easy layer; tomorrow (Day 3–4) you drop to the
+      low-level tokenizer + model API for full control.</li>
+    <li><b>Open-source economics.</b> A specialized model running free on your GPU beats paying a
+      frontier API per call for simple, high-volume tasks — and you own the weights.</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-kw">from</span> transformers <span class="c-kw">import</span> pipeline
+
+<span class="c-com"># default model for the task, on the GPU</span>
+sentiment = <span class="c-fn">pipeline</span>(<span class="c-str">"sentiment-analysis"</span>, device=<span class="c-str">"cuda"</span>)
+<span class="c-fn">sentiment</span>(<span class="c-str">"I'm excited to be learning LLM engineering"</span>)
+<span class="c-com"># -> [{'label': 'POSITIVE', 'score': 0.999}]</span>
+
+<span class="c-com"># pick a specific model when the default is weak</span>
+ner = <span class="c-fn">pipeline</span>(<span class="c-str">"ner"</span>, device=<span class="c-str">"cuda"</span>)
+qa  = <span class="c-fn">pipeline</span>(<span class="c-str">"question-answering"</span>, device=<span class="c-str">"cuda"</span>)
+<span class="c-fn">qa</span>(question=<span class="c-str">"What is a pipeline?"</span>, context=<span class="c-str">"A pipeline is a high-level inference API."</span>)
+
+<span class="c-com"># generation tasks too (image, audio)</span>
+tts = <span class="c-fn">pipeline</span>(<span class="c-str">"text-to-speech"</span>, model=<span class="c-str">"microsoft/speecht5_tts"</span>, device=<span class="c-str">"cuda"</span>)</code></pre>
+
+  <div class="gotcha">
+    <b>Gotcha:</b> the <em>default</em> model isn't always good. In the lesson, the default sentiment
+    model called "I should be more excited" positive; swapping to a multilingual 5-star model rated it
+    a neutral 3/5. <b>Always sanity-check the default before trusting it.</b>
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Interleaves a Week 2 idea with today's pipeline tasks.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What three things does a <code>pipeline()</code> handle for you?","options":["Training, evaluation, and deployment of a model","Tokenization, running the model, and post-processing","Authentication, billing, and rate limiting calls","Downloading, fine-tuning, and quantizing weights"],"answer":1,"why":"A pipeline bundles tokenize → run model → post-process behind one call, so you pass raw input and get structured output."},
+    {"q":"What happens if you omit the model name in <code>pipeline(task)</code>?","options":["It raises an error demanding a model name","Hugging Face selects a sensible default model","It runs every available model and votes","It falls back to calling the OpenAI API"],"answer":1,"why":"HF picks a default model for the task; you can name a specific model when the default is too weak."},
+    {"q":"What does <code>device=\"cuda\"</code> do for a pipeline?","options":["Encrypts the model weights in memory","Runs inference on the Nvidia GPU instead of CPU","Downloads a CUDA-optimized copy of the model","Limits the model to GPU-safe tasks only"],"answer":1,"why":"It places the model and computation on the GPU (cuda); mps targets Apple Silicon, and CPU is the default."},
+    {"q":"When is a small task-specific pipeline a better choice than a frontier API?","options":["When you need the absolute best reasoning quality","For cheap, fast, high-volume simple tasks you own","When the task requires a 1M-token context window","Only when you have no internet connection at all"],"answer":1,"why":"Specialized open models are cheaper, faster, and free of per-call costs for simple high-volume tasks — and you own the weights."},
+    {"q":"(Week 1 recall) A pipeline still can hallucinate because the underlying model…","options":["was trained to be accurate above being plausible","predicts plausible tokens, not guaranteed-true output","never saw enough data during its training run","is too small to store any real facts at all"],"answer":1,"why":"Like any LLM (Week 1 Day 3), a generation pipeline optimizes plausibility — GPT-2 text-generation was called believable nonsense in the lesson."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>Hugging Face — <a href="https://huggingface.co/docs/transformers/main_classes/pipelines">Pipelines reference</a>
+    and the <a href="https://huggingface.co/docs/transformers/quicktour">Quicktour</a>, which builds the same
+    task-by-task tour you did today.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to find the best small model for a specific task on the Hub, or compare
+    two summarizers? Ask. See the <a href="../reference/glossary.html">Week 3 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0011-day1-huggingface-and-colab.html">← Day 1</a>
+    <a href="0013-day3-tokenizers.html">Day 3 — Tokenizers →</a>
+  </nav>
+
+</div>
+</body>
+</html>

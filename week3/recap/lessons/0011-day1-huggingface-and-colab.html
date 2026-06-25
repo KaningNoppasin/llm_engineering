@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W3 Day 1 — Hugging Face &amp; Colab GPUs</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 3 <span class="dot">●</span> Day 1 Recap</p>
+    <h1>Hugging Face &amp; Colab GPUs</h1>
+    <p class="subtitle">Leaving the API behind — running open models on rented hardware.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> Weeks 1–2 rented intelligence through APIs.
+    Week 3 is where you run the models <em>yourself</em>. Owning the weights, the GPU, and the
+    inference is the skill that separates "API caller" from "AI engineer" on a CV.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can attach a free cloud GPU in Google Colab, authenticate to Hugging Face with a token,
+    and generate an image from an open diffusion model.</p>
+  </div>
+
+  <h2>The two halves of Hugging Face</h2>
+  <p>
+    <b>Hugging Face is both a platform and a library.</b> The platform (the website) hosts
+    <b>Models</b>, <b>Datasets</b>, and <b>Spaces</b> (hosted Gradio/Streamlit apps) — think "GitHub
+    for AI", with 2M+ models. The libraries are Python packages that download and run those models.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>Three core libraries.</b> <code>huggingface_hub</code> (download/connect to the Hub),
+      <code>datasets</code> (efficient data handling), and <code>transformers</code> (run the models).
+      Advanced ones come later: PEFT, TRL, Accelerate.</li>
+    <li><b>Google Colab = a notebook on Google's GPUs.</b> A free <b>T4</b> (15 GB VRAM) or a paid
+      <b>A100</b> (40 GB, ~$0.50/hr). The "runtime" is your Python kernel + the attached hardware.</li>
+    <li><b>Check the GPU with <code>!nvidia-smi</code></b> — confirms which card you actually got
+      (the free tier can silently drop you to CPU).</li>
+    <li><b>HF auth via a token.</b> Create a token with <em>write</em> permission (format <code>hf_…</code>),
+      store it in Colab <b>Secrets</b> as <code>HF_TOKEN</code>, then <code>login()</code> in code.</li>
+    <li><b>Gated models.</b> Some models (Meta's Llama) require accepting a license before your token
+      can download them; others (DeepSeek, Qwen) are open access.</li>
+    <li><b>Diffusion models</b> generate images: Stable Diffusion XL (~30 steps) or FLUX. More
+      <code>num_inference_steps</code> = slower but potentially sharper; Turbo variants need ~4.</li>
+    <li><b>Runtime hygiene.</b> "Restart Session" clears variables but keeps pip installs; "Delete
+      Runtime" wipes everything (and you lose GPU memory leaks with it).</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-com"># authenticate to Hugging Face using a Colab secret</span>
+<span class="c-kw">from</span> google.colab <span class="c-kw">import</span> userdata
+<span class="c-kw">from</span> huggingface_hub <span class="c-kw">import</span> login
+login(token=userdata.<span class="c-fn">get</span>(<span class="c-str">"HF_TOKEN"</span>))
+
+<span class="c-com"># generate an image with a diffusers pipeline on the GPU</span>
+<span class="c-kw">from</span> diffusers <span class="c-kw">import</span> DiffusionPipeline
+pipe = DiffusionPipeline.<span class="c-fn">from_pretrained</span>(<span class="c-str">"stabilityai/stable-diffusion-xl-base-1.0"</span>)
+pipe.<span class="c-fn">to</span>(<span class="c-str">"cuda"</span>)                         <span class="c-com"># move model onto the GPU</span>
+image = <span class="c-fn">pipe</span>(<span class="c-str">"a red panda coding, pop-art"</span>, num_inference_steps=<span class="c-str">30</span>).images[<span class="c-str">0</span>]</code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "Why run open-source locally instead of just calling GPT?" —
+    cost at scale, data privacy, no rate limits, full control, and the ability to fine-tune. The
+    tradeoff is you manage the GPU and memory yourself.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">One question reaches back to Week 1 — that interleaving is deliberate.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What is the difference between the HF platform and the HF libraries?","options":["The platform runs models; the libraries host datasets only","The platform is the website (models/datasets/spaces); libraries run them","They are two names for the same Python package","The platform is paid; the libraries are the free tier"],"answer":1,"why":"The platform is the website hosting Models, Datasets and Spaces; the libraries (hub, datasets, transformers) are Python packages that download and run those models."},
+    {"q":"Why must your Hugging Face token have <em>write</em> permission?","options":["Read tokens cannot download any model at all","So you can later upload fine-tuned models you train","Write tokens run faster on the Colab T4 GPU","It is the only format Colab Secrets will accept"],"answer":1,"why":"Write permission lets you push models/datasets back to the Hub later (e.g. fine-tuned weights); read-only would block that."},
+    {"q":"What does <code>!nvidia-smi</code> tell you in a Colab notebook?","options":["The Python version of the current runtime","Which GPU (if any) is attached to your runtime","How many HF models you have downloaded","The remaining balance of your compute units"],"answer":1,"why":"It reports the attached GPU and its memory — useful because the free tier can silently give you CPU instead of a T4."},
+    {"q":"What does <code>num_inference_steps</code> control in a diffusion pipeline?","options":["How many images are generated per prompt","How many denoising steps run — quality vs speed","The resolution of the output image in pixels","How many GPUs the model is split across"],"answer":1,"why":"Diffusion denoises over N steps; more steps is slower but can be sharper. Turbo models need only ~4; SDXL uses ~30."},
+    {"q":"(Week 1 recall) An open-weight model differs from a frontier model because…","options":["Its training data is always fully public too","You can download and run its weights yourself","It cannot be used for commercial products","It only runs on Hugging Face servers"],"answer":1,"why":"Open-weight means the trained weights are downloadable and runnable (the Week 2 distinction); frontier models stay behind a paid API."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>Hugging Face — <a href="https://huggingface.co/docs/transformers/index">Transformers docs</a> and the
+    <a href="https://huggingface.co/docs/hub/index">Hub guide</a>. For diffusion specifically, the
+    <a href="https://huggingface.co/docs/diffusers/index">Diffusers docs</a>.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want help getting a Llama gated-model approval, or picking T4 vs A100 for a
+    task? Ask. Terms live in the <a href="../reference/glossary.html">Week 3 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <span></span>
+    <a href="0012-day2-pipelines.html">Day 2 — Pipelines →</a>
+  </nav>
+
+</div>
+</body>
+</html>

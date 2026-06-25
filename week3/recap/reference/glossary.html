@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 3 Glossary — LLM Engineering</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 3 <span class="dot">●</span> Reference</p>
+    <h1>Week 3 glossary</h1>
+    <p class="subtitle">The open-source week: Hugging Face, pipelines, tokenizers, quantization. Print &amp; pin.</p>
+  </header>
+
+  <p class="note">New terms from Week 3. See also the
+  <a href="../../../week1/recap/reference/glossary.html">Week 1</a> and
+  <a href="../../../week2/recap/reference/glossary.html">Week 2</a> glossaries.</p>
+
+  <table>
+    <thead><tr><th>Term</th><th>Meaning</th><th>Day</th></tr></thead>
+    <tbody>
+      <tr><td><b>Hugging Face Hub</b></td><td>Platform hosting Models, Datasets, and Spaces — "GitHub for AI" (2M+ models).</td><td>1</td></tr>
+      <tr><td><b>Spaces</b></td><td>HF-hosted apps (often Gradio/Streamlit) you can deploy and share.</td><td>1</td></tr>
+      <tr><td><b>transformers</b></td><td>The core HF library for loading and running transformer models.</td><td>1, 4</td></tr>
+      <tr><td><b>datasets / hub</b></td><td>HF libraries for data handling and for connecting to/downloading from the Hub.</td><td>1</td></tr>
+      <tr><td><b>Google Colab</b></td><td>Hosted notebook running on Google's cloud machines with optional GPUs.</td><td>1</td></tr>
+      <tr><td><b>T4 / A100</b></td><td>GPUs in Colab: free T4 (15 GB VRAM), paid A100 (40 GB, ~$0.50/hr).</td><td>1</td></tr>
+      <tr><td><b>HF_TOKEN</b></td><td>Access token (<code>hf_…</code>); needs <em>write</em> scope to upload; stored in Colab Secrets.</td><td>1</td></tr>
+      <tr><td><b>Gated model</b></td><td>A model (e.g. Llama) requiring license acceptance before download.</td><td>1, 3</td></tr>
+      <tr><td><b>Diffusion model</b></td><td>Image generator (Stable Diffusion XL, FLUX); denoises over <code>num_inference_steps</code>.</td><td>1</td></tr>
+      <tr><td><b>pipeline()</b></td><td>High-level inference API: tokenize → run → post-process behind one call.</td><td>2</td></tr>
+      <tr><td><b>Task</b></td><td>What a pipeline does: sentiment, ner, question-answering, summarization, etc.</td><td>2</td></tr>
+      <tr><td><b>device="cuda"</b></td><td>Run on the Nvidia GPU (<code>mps</code> = Apple Silicon, CPU default).</td><td>2</td></tr>
+      <tr><td><b>AutoTokenizer</b></td><td><code>from_pretrained(model)</code> loads the right tokenizer for a model.</td><td>3</td></tr>
+      <tr><td><b>encode / decode</b></td><td>Convert text → token IDs and back; IDs are model-specific.</td><td>3</td></tr>
+      <tr><td><b>Special tokens</b></td><td>Reserved IDs (BOS, EOS, role markers) signalling structure, learned in training.</td><td>3</td></tr>
+      <tr><td><b>apply_chat_template</b></td><td>Formats a message list into the model's expected token string with special tokens.</td><td>3, 4, 5</td></tr>
+      <tr><td><b>add_generation_prompt</b></td><td>Appends the assistant header so the model knows it's its turn to speak.</td><td>3</td></tr>
+      <tr><td><b>Vocab size</b></td><td>Number of tokens a model knows (Llama 3.1: 128,256); a size/efficiency tradeoff.</td><td>3</td></tr>
+      <tr><td><b>AutoModelForCausalLM</b></td><td>Low-level loader for autoregressive (next-token) models.</td><td>4</td></tr>
+      <tr><td><b>Causal LM</b></td><td>Predicts each token from prior tokens only (causal mask blocks the future).</td><td>4</td></tr>
+      <tr><td><b>Quantization</b></td><td>Storing weights in fewer bits (4-bit nf4) to cut memory ~4× with little quality loss.</td><td>4, 5</td></tr>
+      <tr><td><b>BitsAndBytesConfig</b></td><td>Config object enabling <code>load_in_4bit</code>, nf4, bfloat16 compute, double-quant.</td><td>4</td></tr>
+      <tr><td><b>device_map="auto"</b></td><td>Auto-places model weights across available GPU/CPU memory.</td><td>4</td></tr>
+      <tr><td><b>Embedding layer</b></td><td>Maps each vocab token ID to a dense vector (e.g. 2,048 dims).</td><td>4</td></tr>
+      <tr><td><b>Decoder layer</b></td><td>Self-attention (Q/K/V/output) + MLP (up/gate/down) + layer norm; stacked N times.</td><td>4</td></tr>
+      <tr><td><b>Non-linearity</b></td><td>Activation (SiLU/ReLU) in the MLP; without it, stacked linear layers collapse to one.</td><td>4</td></tr>
+      <tr><td><b>LM head</b></td><td>Final layer mapping the hidden state to vocab-sized logits for the next token.</td><td>4</td></tr>
+      <tr><td><b>model.generate()</b></td><td>Runs token-by-token generation given input token tensors.</td><td>4, 5</td></tr>
+      <tr><td><b>Whisper</b></td><td>OpenAI speech-to-text model; free via HF pipeline or paid via API.</td><td>5</td></tr>
+      <tr><td><b>Temperature</b></td><td>Randomness of token choice: 0 = greedy/deterministic, higher = more varied.</td><td>5</td></tr>
+      <tr><td><b>TextStreamer</b></td><td>Utility that decodes and prints tokens as they are generated.</td><td>5</td></tr>
+    </tbody>
+  </table>
+
+  <p class="teacher">
+    <b>Your reference doc — it outlives the lessons.</b> Fuzzy on a row? Ask me to re-teach just that one.
+    Back to <a href="../lessons/0011-day1-huggingface-and-colab.html">Week 3 Day 1</a>.
+  </p>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W3 Day 5 — Audio → Meeting Minutes</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 3 <span class="dot">●</span> Day 5 Recap</p>
+    <h1>Audio → meeting minutes</h1>
+    <p class="subtitle">Chaining a frontier transcriber with an open generator — the capstone build.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> the most valuable engineers <em>combine</em>
+    models — closed where it's best, open where it's cheapest. This audio→minutes app is a complete,
+    portfolio-ready product that proves you can architect a multi-model pipeline.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can transcribe audio with Whisper, summarize it into structured minutes with an open Llama
+    model, and stream the output token-by-token with <code>TextStreamer</code>.</p>
+  </div>
+
+  <h2>The two-stage pipeline</h2>
+  <p>
+    <b>Audio → Whisper (transcription) → Llama 3.2 (generation) → markdown minutes.</b> Stage one uses
+    a <em>frontier</em> speech model; stage two uses an <em>open-source</em> LLM you run yourself. Each
+    stage does one job well — the essence of pipeline thinking.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>Whisper for speech-to-text.</b> Run it free via a HF <code>automatic-speech-recognition</code>
+      pipeline, or via OpenAI's paid API (faster: ~27s vs ~2min in the lesson, for ~$0.02).</li>
+    <li><b>Open LLM for generation.</b> Feed the transcript to Llama 3.2 (3B) with a system prompt that
+      demands structured minutes: summary, discussion points, action items with owners.</li>
+    <li><b>Generation is token-by-token.</b> One forward pass yields ~128k logits (one per vocab token);
+      pick one, append, repeat. Each new token is conditioned on all prior ones — that's the coherence.</li>
+    <li><b>Temperature</b> tunes the pick: <code>0</code> = greedy/deterministic, higher = more varied,
+      sampling from lower-probability tokens.</li>
+    <li><b><code>TextStreamer</code></b> decodes and prints tokens as they're generated — real-time
+      output instead of waiting for the whole response.</li>
+    <li><b><code>tokenizer.pad_token = tokenizer.eos_token</code></b> — a common Llama setup line so
+      padding doesn't confuse generation.</li>
+    <li><b>It all runs on a free Colab T4</b> thanks to Day 4's 4-bit quantization (open generation
+      stage is the heavy part).</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-com"># stage 1: transcribe audio with Whisper (free HF pipeline)</span>
+asr = <span class="c-fn">pipeline</span>(<span class="c-str">"automatic-speech-recognition"</span>, model=<span class="c-str">"openai/whisper-small.en"</span>)
+transcript = <span class="c-fn">asr</span>(<span class="c-str">"meeting.wav"</span>)[<span class="c-str">"text"</span>]
+
+<span class="c-com"># stage 2: summarize into minutes with an open LLM, streamed</span>
+<span class="c-kw">from</span> transformers <span class="c-kw">import</span> TextStreamer
+messages = [
+    {<span class="c-str">"role"</span>: <span class="c-str">"system"</span>, <span class="c-str">"content"</span>: <span class="c-str">"Produce markdown minutes: summary, points, action items."</span>},
+    {<span class="c-str">"role"</span>: <span class="c-str">"user"</span>,   <span class="c-str">"content"</span>: <span class="c-str">f"Transcript:\n{transcript}"</span>},
+]
+inputs = tok.<span class="c-fn">apply_chat_template</span>(messages, return_tensors=<span class="c-str">"pt"</span>).<span class="c-fn">to</span>(<span class="c-str">"cuda"</span>)
+streamer = <span class="c-fn">TextStreamer</span>(tok)
+model.<span class="c-fn">generate</span>(inputs, streamer=streamer, max_new_tokens=<span class="c-str">1024</span>)</code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "When mix closed and open models?" — Use the best frontier model
+    for the hard, low-volume step (accurate transcription) and a cheap open model for the bulk
+    generation you'll run often. You optimize cost and quality per stage, not for the whole app at once.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Final Week 3 quiz — it interleaves Days 4, 5 and a Week 2 idea.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What is the two-stage architecture of the meeting-minutes app?","options":["Llama transcribes audio, then Whisper summarizes it","Whisper transcribes audio, then an open LLM summarizes","One model does both transcription and summary","Gradio records audio, then GPT-4 writes minutes"],"answer":1,"why":"Stage 1 is Whisper (speech-to-text), stage 2 is an open LLM (Llama 3.2) generating structured minutes from the transcript."},
+    {"q":"What does <code>temperature=0</code> do during generation?","options":["Disables the model&#39;s output entirely","Always picks the highest-probability next token","Makes the output maximally random and creative","Sets the maximum number of new tokens"],"answer":1,"why":"Temperature 0 is greedy/deterministic — it always takes the top token; higher temperatures sample from lower-probability options for variety."},
+    {"q":"What does <code>TextStreamer</code> give you?","options":["Faster total generation on the GPU","Tokens decoded and printed as they are generated","A way to stream audio into the model","Automatic translation of the output"],"answer":1,"why":"TextStreamer prints each token as it is produced, giving real-time output instead of waiting for the full response."},
+    {"q":"Why mix a closed model (Whisper API) with an open one (Llama)?","options":["Open models cannot transcribe audio at all","Best model for the hard step, cheap one for the bulk","Closed models are always required by Hugging Face","It is the only way to run on a free T4 GPU"],"answer":1,"why":"You spend frontier quality on the accuracy-critical, low-volume step and a cheap open model on the high-volume generation — optimizing per stage."},
+    {"q":"(Day 4 recall) The open generation stage fits on a free T4 because…","options":["Llama 3.2 has only a few million parameters","it is loaded in 4-bit quantization to save memory","Colab gives unlimited GPU memory for free","the transcript is too short to need much memory"],"answer":1,"why":"Day 4&#39;s 4-bit quantization shrinks the model ~4x, which is what lets a billion-parameter LLM run on a 15GB T4."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>OpenAI — <a href="https://platform.openai.com/docs/guides/speech-to-text">Speech-to-text (Whisper) guide</a>;
+    Hugging Face — <a href="https://huggingface.co/docs/transformers/main/en/internal/generation_utils#transformers.TextStreamer">TextStreamer</a>
+    and the <a href="https://huggingface.co/docs/transformers/main/en/generation_strategies">generation strategies</a> (temperature, sampling).</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to turn this into a Gradio app (Week 2!) or swap in a bigger open model
+    for the summary? Ask. Everything's in the <a href="../reference/glossary.html">Week 3 glossary</a>,
+    and you can revisit the <a href="0011-day1-huggingface-and-colab.html">Week 3 lessons index</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0014-day4-quantization-and-internals.html">← Day 4</a>
+    <a href="../reference/glossary.html">Week 3 glossary →</a>
+  </nav>
+
+</div>
+</body>
+</html>
