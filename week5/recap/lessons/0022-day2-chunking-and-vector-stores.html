@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W5 Day 2 — Chunking &amp; Vector Stores</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 5 <span class="dot">●</span> Day 2 Recap</p>
+    <h1>Chunking &amp; vector stores</h1>
+    <p class="subtitle">Turning documents into searchable vectors — the ingest half of RAG.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> retrieval quality is decided here, at ingest. How
+    you chunk and which embedding model you pick make or break a RAG system — and these are the knobs
+    you'll be expected to tune on the job.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can split documents into overlapping chunks, embed them, and store them in a Chroma vector
+    database ready for semantic search.</p>
+  </div>
+
+  <h2>The ingest pipeline</h2>
+  <p>
+    <b>Load → chunk → embed → store.</b> Documents are split into <em>chunks</em>, each chunk is turned
+    into a <em>vector</em> by an embedding model, and the (text, vector) pairs go into a <em>vector
+    database</em> for fast similarity search.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>Chunk, don't embed whole docs.</b> A question usually concerns one passage, not the whole
+      file. Many small vectors per document match far better than one big one.</li>
+    <li><b><code>RecursiveCharacterTextSplitter</code></b> splits on natural boundaries (paragraphs →
+      lines → spaces), controlled by <code>chunk_size</code> and <code>chunk_overlap</code>.</li>
+    <li><b>Overlap prevents cut answers.</b> <code>chunk_overlap=200</code> repeats a little text across
+      neighbours so a fact split across a boundary still lands whole in some chunk.</li>
+    <li><b>The encoder makes the vector; the DB stores it.</b> Two separate components: an embedding
+      model (<code>OpenAIEmbeddings</code>, or open <code>all-MiniLM-L6-v2</code>) and a vector store.</li>
+    <li><b>Dimensions vary by model.</b> all-MiniLM-L6-v2 = 384, <code>text-embedding-3-small</code> =
+      1536, <code>-large</code> = 3072. Bigger generally separates meaning better — but costs more.</li>
+    <li><b>Vector DBs:</b> <b>Chroma</b> (lightweight, local, SQLite-backed — used here), <b>FAISS</b>
+      (in-memory), Pinecone/Weaviate (managed, paid). They do similarity search, not SQL.</li>
+    <li><b>t-SNE</b> projects high-dim vectors to 2D/3D so you can <em>see</em> whether related chunks
+      cluster — a quick visual check of embedding quality.</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-kw">from</span> langchain_text_splitters <span class="c-kw">import</span> RecursiveCharacterTextSplitter
+<span class="c-kw">from</span> langchain_chroma <span class="c-kw">import</span> Chroma
+<span class="c-kw">from</span> langchain_openai <span class="c-kw">import</span> OpenAIEmbeddings
+
+<span class="c-com"># 1. chunk</span>
+splitter = <span class="c-fn">RecursiveCharacterTextSplitter</span>(chunk_size=<span class="c-str">1000</span>, chunk_overlap=<span class="c-str">200</span>)
+chunks = splitter.<span class="c-fn">split_documents</span>(documents)
+
+<span class="c-com"># 2. embed + 3. store (one call builds the vector DB)</span>
+embeddings = <span class="c-fn">OpenAIEmbeddings</span>()                  <span class="c-com"># or HuggingFaceEmbeddings(...)</span>
+vectorstore = Chroma.<span class="c-fn">from_documents</span>(documents=chunks, embedding=embeddings,
+                                     persist_directory=<span class="c-str">"vector_db"</span>)</code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "How do you pick chunk size?" — There's no universal answer; it's
+    empirical. Smaller chunks (e.g. 500) often retrieve more precisely but risk losing context; you
+    <em>measure</em> it (Day 4). And the embedding model at ingest <b>must match</b> the one at query —
+    different dimensions = error.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Interleaves a Week 3 idea with today's ingest pipeline.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"Why split documents into chunks instead of one vector per file?","options":["It uses less disk space in the database","Questions match a passage, so chunks retrieve better","Whole documents cannot be embedded at all","It avoids paying for the embedding model"],"answer":1,"why":"A question usually concerns one passage; many small chunk-vectors match a query far more precisely than one vector for a whole document."},
+    {"q":"What does <code>chunk_overlap</code> prevent?","options":["Two documents sharing the same vector","A fact being split across a chunk boundary","The vector database from growing too large","The embedding model from timing out"],"answer":1,"why":"Overlap repeats a little text between neighbouring chunks so an answer spanning a boundary still appears whole in at least one chunk."},
+    {"q":"Which component actually creates the vector?","options":["The Chroma vector database stores and makes it","The embedding model; the DB only stores it","The text splitter during chunking","The retriever at query time"],"answer":1,"why":"The embedding model (encoder) converts text to a vector; Chroma/FAISS only store and search those vectors."},
+    {"q":"What does t-SNE let you do with embeddings?","options":["Speed up retrieval at query time","Project them to 2D/3D to see clustering","Increase the vector dimension count","Encrypt the vectors before storage"],"answer":1,"why":"t-SNE reduces high-dimensional vectors to 2D/3D so you can visually check whether semantically related chunks cluster together."},
+    {"q":"(Week 3 recall) Why must ingest and query use the same embedding model?","options":["To keep the API key consistent across calls","Different models give different-dimension vectors","Otherwise the LLM cannot generate an answer","To avoid re-downloading the model weights"],"answer":1,"why":"Each model outputs its own vector space and dimension (e.g. 384 vs 1536); mixing them gives a dimension mismatch and meaningless distances."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>LangChain — <a href="https://python.langchain.com/docs/concepts/text_splitters/">Text splitters</a>
+    and <a href="https://python.langchain.com/docs/integrations/vectorstores/chroma/">Chroma vector store</a>.
+    For the encoder side, <a href="https://www.sbert.net/">Sentence-Transformers</a>.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to compare two embedding models on your own docs with a t-SNE plot, or
+    reason about chunk size for a specific corpus? Ask. See the
+    <a href="../reference/glossary.html">Week 5 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0021-day1-rag-and-embeddings.html">← Day 1</a>
+    <a href="0023-day3-rag-pipeline.html">Day 3 — The full pipeline →</a>
+  </nav>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W5 Day 4 — Evaluating RAG</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 5 <span class="dot">●</span> Day 4 Recap</p>
+    <h1>Evaluating RAG</h1>
+    <p class="subtitle">Turn the "vector-similarity hack" into a measured, iterable system.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> anyone can wire up a RAG demo; the engineer who
+    gets hired can <em>measure</em> it and improve it on purpose. Evaluation is what separates a science
+    project from a production system — and it builds on Week 4's metrics discipline.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can measure retrieval with MRR, judge answer quality with an LLM-as-judge returning structured
+    output, and iterate chunking/embeddings to move the score.</p>
+  </div>
+
+  <h2>Two halves of evaluation</h2>
+  <p>
+    RAG can fail at <b>retrieval</b> (wrong chunks) or at <b>answering</b> (good chunks, bad answer). So
+    you measure both: <em>retrieval metrics</em> on the chunks, and <em>answer-quality metrics</em> on the
+    final text — the latter via an <b>LLM-as-a-judge</b>.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>MRR (Mean Reciprocal Rank).</b> 1 ÷ the position of the first relevant chunk, averaged over
+      tests. MRR = 1.0 means the right chunk was always first; 0.5 means second on average.</li>
+    <li><b>nDCG</b> rewards ranking <em>all</em> relevant chunks high, not just the first; <b>keyword
+      coverage / recall</b> checks the needed facts appear in the top-k.</li>
+    <li><b>Favor recall over precision.</b> Missing context is fatal (the LLM can't invent it); extra
+      noise the LLM can usually ignore.</li>
+    <li><b>LLM-as-a-judge.</b> Have a model score the generated answer vs a reference on accuracy /
+      completeness / relevance (1–5) — using <b>structured outputs</b> (a Pydantic schema) so you get
+      typed JSON, not prose to parse.</li>
+    <li><b>Golden test data.</b> Curate ~150 questions with expected keywords and reference answers
+      (loaded as Pydantic models). Categories: direct-fact, temporal, and the hard ones — <em>spanning</em>
+      (multi-chunk) and <em>holistic</em>.</li>
+    <li><b>Iterate the levers.</b> Chunk size and embedding model move the score: in the lesson,
+      500-char chunks + OpenAI <code>text-embedding-3-large</code> beat 1000-char + MiniLM (MRR
+      0.73 → 0.79, coverage 81% → 92%).</li>
+    <li><b>Control your variables.</b> When comparing chunk sizes, hold total context constant so you're
+      measuring granularity, not context length.</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-kw">from</span> pydantic <span class="c-kw">import</span> BaseModel
+
+<span class="c-com"># golden test case + judge schema as Pydantic models</span>
+<span class="c-kw">class</span> <span class="c-fn">TestQuestion</span>(BaseModel):
+    question: str; keywords: <span class="c-fn">list</span>[str]; reference_answer: str
+
+<span class="c-kw">class</span> <span class="c-fn">AnswerEval</span>(BaseModel):
+    feedback: str; accuracy: float; completeness: float; relevance: float
+
+<span class="c-com"># MRR: reciprocal of the first relevant chunk's position</span>
+<span class="c-kw">def</span> <span class="c-fn">reciprocal_rank</span>(chunks, keyword):
+    <span class="c-kw">for</span> i, c <span class="c-kw">in</span> <span class="c-fn">enumerate</span>(chunks, start=<span class="c-str">1</span>):
+        <span class="c-kw">if</span> keyword <span class="c-kw">in</span> c.page_content.<span class="c-fn">lower</span>(): <span class="c-kw">return</span> <span class="c-str">1</span> / i
+    <span class="c-kw">return</span> <span class="c-str">0</span>
+
+<span class="c-com"># LLM-as-judge with structured output (typed result, no parsing)</span>
+verdict = client.beta.chat.completions.<span class="c-fn">parse</span>(model=JUDGE, messages=[...],
+                                              response_format=AnswerEval)</code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "How do you know your RAG got better?" — A frozen golden set + MRR/nDCG
+    for retrieval + an LLM judge for answers. Change one lever (chunk size, embedding model), re-run,
+    compare. Without a baseline, "it feels better" is not evidence.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Interleaves a Week 4 idea with today's RAG metrics.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What does an MRR of 1.0 mean?","options":["Every answer scored full marks from the judge","The first retrieved chunk was always relevant","All chunks in the database were returned","The embedding model has 1.0 accuracy"],"answer":1,"why":"MRR is 1 ÷ position of the first relevant chunk, averaged; 1.0 means the relevant chunk was always ranked first."},
+    {"q":"Why favor recall over precision in RAG retrieval?","options":["Precision is impossible to measure here","Missing context is fatal; the LLM can ignore noise","Recall is cheaper to compute than precision","Precision needs an LLM judge to score"],"answer":1,"why":"If the needed context is missing the LLM can&#39;t recover it, but it can usually filter extra noise — so missing info is the worse failure."},
+    {"q":"What is \"LLM-as-a-judge\"?","options":["A model that retrieves the chunks for you","A model scoring answers vs a reference, as structured output","A leaderboard ranking embedding models","A way to chunk documents automatically"],"answer":1,"why":"You use an LLM to grade generated answers against reference answers on criteria like accuracy/completeness, returning a typed (Pydantic) score."},
+    {"q":"Which two question types is RAG weakest on?","options":["Direct-fact and temporal questions","Spanning (multi-chunk) and holistic questions","Yes/no and single-word questions","Numeric and date-based questions"],"answer":1,"why":"Spanning questions need facts across several chunks and holistic ones need whole-corpus understanding — both stress simple top-k retrieval."},
+    {"q":"(Week 4 recall) Using structured outputs for the judge matters because…","options":["it makes the judge model run faster","it forces typed JSON instead of prose to parse","it lowers the cost of every judgment","it removes the need for reference answers"],"answer":1,"why":"As with Week 2/4 structured output, a Pydantic schema forces valid typed JSON, so you read accuracy/completeness fields reliably without parsing text."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>Zheng et al., <a href="https://arxiv.org/abs/2306.05685"><i>Judging LLM-as-a-Judge</i></a> (2023).
+    For retrieval metrics, any reference on <a href="https://en.wikipedia.org/wiki/Mean_reciprocal_rank">MRR</a>
+    and <a href="https://en.wikipedia.org/wiki/Discounted_cumulative_gain">nDCG</a>.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to build a small golden set for your own docs, or wire an LLM judge with a
+    Pydantic schema? Ask. See the <a href="../reference/glossary.html">Week 5 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0023-day3-rag-pipeline.html">← Day 3</a>
+    <a href="0025-day5-advanced-rag.html">Day 5 — Advanced RAG →</a>
+  </nav>
+
+</div>
+</body>
+</html>

@@ -34,7 +34,11 @@
   benchmarks (Chinchilla/GPQA/MMLU-Pro/HLE), leaderboards, Python→C++/Rust code-gen, frontier vs
   open, technical vs business metrics. Days 1–2 had no notebooks (conceptual). See
   [week4 learning record](../../week4/recap/learning-records/0004-week4-selection-and-eval.md).
-- **Next:** after spacing, a mixed Week 1–4 exam; then the **Week 5** recap (RAG).
+- **Week 5 recap: done** (lessons 0021–0025, `week5/recap/`) — RAG: embeddings, chunking + vector
+  stores (Chroma), the retriever+LLM pipeline, evaluation (MRR/nDCG/LLM-as-judge), advanced RAG
+  (semantic chunking, query rewriting/expansion, re-ranking; 0.73→0.91 MRR). Single arc, all days
+  have notebooks. See [week5 learning record](../../week5/recap/learning-records/0005-week5-rag.md).
+- **Next:** after spacing, a mixed Week 1–5 exam; then the **Week 6** recap (fine-tuning).
 
 ## Quiz authoring rule (learned the hard way)
 - Inside `data-quiz='...'` JSON, every apostrophe MUST be the entity `&#39;` — a raw `'`

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W5 Day 1 — RAG &amp; Vector Embeddings</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 5 <span class="dot">●</span> Day 1 Recap</p>
+    <h1>RAG &amp; vector embeddings</h1>
+    <p class="subtitle">Grounding the model in your own knowledge — from keyword lookup to meaning.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> RAG is the most-deployed LLM pattern in industry —
+    every "chat with your docs" product is RAG. It's also the cure for hallucination on private/fresh
+    data. If you can build and explain RAG, you can build what most companies actually want.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can explain why semantic vector search beats keyword lookup, and build a naive RAG that
+    injects retrieved context into the prompt.</p>
+  </div>
+
+  <h2>The big idea</h2>
+  <p>
+    An LLM only knows its training data. <b>RAG (Retrieval-Augmented Generation)</b> fixes that:
+    <em>retrieve</em> the documents relevant to a question, <em>stuff them into the prompt</em>, then
+    <em>generate</em> the answer grounded in that context. Week 2's "primitive RAG" (an
+    <code>if "belt" in message</code>) was the toy version — this week makes it real.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>Naive RAG = keyword lookup.</b> Match words in the question to documents, inject their text.
+      Brittle: "Heathrow flights" won't match "London airport prices" — different words, same meaning.</li>
+    <li><b>The fix is semantic search.</b> Turn text into <b>vector embeddings</b> (lists of numbers
+      capturing meaning) and retrieve by <em>closeness in vector space</em>, not string overlap.</li>
+    <li><b>Two kinds of model.</b> <em>Generative/autoregressive</em> models (GPT, Claude) produce text;
+      <em>encoder/embedding</em> models (BERT, OpenAI <code>text-embedding-3</code>) map text → one vector.
+      RAG uses an encoder to retrieve, a generator to answer.</li>
+    <li><b>A vector is a point in meaning-space.</b> Typically 300–3072 dimensions; similar meanings land
+      near each other, so "flights to London" ≈ "Heathrow ticket prices".</li>
+    <li><b>word2vec showed meaning is arithmetic.</b> The classic
+      <code>king − man + woman ≈ queen</code> — vectors encode relationships you can add and subtract.</li>
+    <li><b>Cosine similarity</b> ranks how close two vectors are; retrieval grabs the top-k nearest
+      documents to the query vector.</li>
+    <li><b>RAG ≠ fine-tuning.</b> You add knowledge at <em>inference</em> time via the prompt — no
+      retraining, and you can update the knowledge base instantly.</li>
+  </ul>
+
+  <h2>The code shape to memorize (naive RAG)</h2>
+  <pre><code><span class="c-com"># 1. load a knowledge base keyed by name</span>
+knowledge = {Path(f).stem.<span class="c-fn">split</span>()[-<span class="c-str">1</span>].<span class="c-fn">lower</span>(): <span class="c-fn">open</span>(f).<span class="c-fn">read</span>()
+             <span class="c-kw">for</span> f <span class="c-kw">in</span> glob.<span class="c-fn">glob</span>(<span class="c-str">"knowledge-base/employees/*"</span>)}
+
+<span class="c-com"># 2. keyword lookup -> relevant context (the BRITTLE part)</span>
+<span class="c-kw">def</span> <span class="c-fn">get_context</span>(message):
+    words = message.<span class="c-fn">lower</span>().<span class="c-fn">split</span>()
+    <span class="c-kw">return</span> [knowledge[w] <span class="c-kw">for</span> w <span class="c-kw">in</span> words <span class="c-kw">if</span> w <span class="c-kw">in</span> knowledge]
+
+<span class="c-com"># 3. inject context into the prompt, then generate</span>
+system = SYSTEM_PREFIX + <span class="c-str">"\n\nContext:\n"</span> + <span class="c-str">"\n\n"</span>.<span class="c-fn">join</span>(<span class="c-fn">get_context</span>(q))
+openai.chat.completions.<span class="c-fn">create</span>(model=<span class="c-str">"gpt-4.1-nano"</span>, messages=[...])</code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "RAG vs fine-tuning?" — RAG injects knowledge at query time (fast to
+    update, cites sources, no training); fine-tuning bakes behavior into weights (Week 6–7). Most "chat
+    with your data" needs are RAG, not fine-tuning.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">One question reaches back to Week 2 — interleaving is deliberate.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What problem does RAG primarily solve?","options":["It makes the model generate tokens faster","It grounds answers in your data, cutting hallucination","It compresses the model to run on a CPU","It removes the need for a system prompt"],"answer":1,"why":"RAG retrieves relevant private/fresh context and injects it into the prompt, so answers are grounded in your knowledge rather than hallucinated."},
+    {"q":"Why is semantic vector search better than keyword matching?","options":["It uses fewer tokens per query overall","It matches by meaning, tolerating different wording","It never needs an embedding model to work","It guarantees the answer is always correct"],"answer":1,"why":"Vectors place similar meanings close together, so Heathrow vs London airport still match — keyword lookup fails on synonyms and paraphrases."},
+    {"q":"What is the role of an encoder/embedding model in RAG?","options":["It generates the final answer text","It converts text into vectors for retrieval","It compiles the knowledge base to binary","It ranks the model on a leaderboard"],"answer":1,"why":"The encoder maps text to a meaning vector used for similarity retrieval; a separate generative model writes the answer from the retrieved text."},
+    {"q":"What does <code>king − man + woman ≈ queen</code> demonstrate?","options":["That embeddings are random noise","That vectors encode relationships you can do arithmetic on","That keyword search is sufficient for RAG","That bigger models always embed better"],"answer":1,"why":"The word2vec example shows embeddings capture semantic relationships — adding/subtracting vectors meaningfully shifts meaning."},
+    {"q":"(Week 2 recall) Week 2&#39;s \"primitive RAG\" differed from real RAG because it…","options":["used a vector database for retrieval","injected context via a keyword if-statement","fine-tuned the model on store data","ranked chunks with a cross-encoder"],"answer":1,"why":"Week 2 Day 3 used a hand-coded keyword check to add context; real RAG replaces that with embedding-based semantic retrieval."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>Lewis et al., <a href="https://arxiv.org/abs/2005.11401"><i>Retrieval-Augmented Generation for
+    Knowledge-Intensive NLP Tasks</i></a> (2020) — the paper that named RAG. For embeddings, OpenAI's
+    <a href="https://platform.openai.com/docs/guides/embeddings">Embeddings guide</a>.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to see why the keyword RAG fails on a real query, or how cosine
+    similarity is computed? Ask. Terms live in the <a href="../reference/glossary.html">Week 5 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <span></span>
+    <a href="0022-day2-chunking-and-vector-stores.html">Day 2 — Chunking &amp; vector stores →</a>
+  </nav>
+
+</div>
+</body>
+</html>

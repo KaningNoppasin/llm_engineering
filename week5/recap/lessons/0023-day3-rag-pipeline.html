@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W5 Day 3 — The Full RAG Pipeline</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 5 <span class="dot">●</span> Day 3 Recap</p>
+    <h1>The full RAG pipeline</h1>
+    <p class="subtitle">Retriever + LLM + memory, wired into a chat UI — RAG end to end.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> this is the deliverable — a working "chat with your
+    documents" app. Being able to stand one up, with conversation memory, in a few dozen lines is a
+    direct, demonstrable job skill.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can build the RAG core in ~5 lines — embed query, retrieve top-k chunks, inject, answer — and
+    wrap it in a Gradio chat with conversation history.</p>
+  </div>
+
+  <h2>The RAG core loop</h2>
+  <p>
+    <b>Embed the query → search the vector DB → retrieve top-k chunks → stuff into the prompt → LLM
+    answers.</b> A <b>retriever</b> (from <code>vectorstore.as_retriever()</code>) packages the embed +
+    search steps; the LLM answers grounded in the retrieved text.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>The retriever abstraction.</b> <code>vectorstore.as_retriever()</code> bundles the embedding
+      model + Chroma into one object with <code>.invoke(query)</code> that returns
+      <code>Document</code>s (each with <code>.page_content</code> and <code>.metadata</code>).</li>
+    <li><b>top-k.</b> The retriever returns the k nearest chunks (default ~4; the lesson used k=5). More k
+      = more context but more noise and cost.</li>
+    <li><b>Inject, then generate.</b> Join the retrieved chunks into the system prompt, then call the LLM
+      with that context + the user question.</li>
+    <li><b>Temperature 0 for RAG.</b> You want faithful, deterministic answers from the context — not
+      creativity. (Temperature ≠ creativity; that comes from the prompt.)</li>
+    <li><b>Conversation memory needs care.</b> The LLM is stateless (Week 1), so you pass history — and
+      crucially, <em>retrieve using the combined history</em>: "what's her salary?" after "who is
+      Avery?" must still pull Avery's chunk.</li>
+    <li><b>Chunking can bite back.</b> A chunk may contain the answer but miss context from the document
+      top (e.g. an award mentioned without the person's full name) — a retrieval-quality problem.</li>
+    <li><b>Wrap it in Gradio.</b> <code>gr.ChatInterface(answer_question)</code> gives a chat UI; the
+      callback takes <code>(question, history)</code> (Week 2 again).</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-com"># setup: load the persisted vector DB and build a retriever + LLM</span>
+vectorstore = <span class="c-fn">Chroma</span>(persist_directory=DB, embedding_function=embeddings)
+retriever   = vectorstore.<span class="c-fn">as_retriever</span>(search_kwargs={<span class="c-str">"k"</span>: <span class="c-str">5</span>})
+llm = <span class="c-fn">ChatOpenAI</span>(model=MODEL, temperature=<span class="c-str">0</span>)
+
+<span class="c-com"># the RAG core — five lines</span>
+<span class="c-kw">def</span> <span class="c-fn">answer_question</span>(question, history):
+    docs = retriever.<span class="c-fn">invoke</span>(question)                      <span class="c-com"># top-k chunks</span>
+    context = <span class="c-str">"\n\n"</span>.<span class="c-fn">join</span>(d.page_content <span class="c-kw">for</span> d <span class="c-kw">in</span> docs)
+    prompt = SYSTEM_TEMPLATE.<span class="c-fn">format</span>(context=context)
+    reply = llm.<span class="c-fn">invoke</span>([<span class="c-fn">SystemMessage</span>(prompt), <span class="c-fn">HumanMessage</span>(question)])
+    <span class="c-kw">return</span> reply.content
+
+gr.<span class="c-fn">ChatInterface</span>(answer_question).<span class="c-fn">launch</span>()</code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "Why does a follow-up question break naive RAG?" — Because you
+    retrieve on the latest message alone. "What's her salary?" has no name to match. Fix: retrieve using
+    the combined conversation (or a rewritten query — Day 5).
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Interleaves a Week 1 idea with today's pipeline.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What does <code>vectorstore.as_retriever()</code> give you?","options":["A fine-tuned model for your documents","An object that embeds a query and returns top-k chunks","A Gradio UI for the vector database","A way to re-chunk the documents on the fly"],"answer":1,"why":"The retriever bundles the embedding + similarity search into one .invoke(query) call returning the top-k most relevant Document chunks."},
+    {"q":"Why use temperature 0 in a RAG answer step?","options":["It makes the model answer more creatively","It gives faithful, deterministic answers from context","It increases the number of chunks retrieved","It is required whenever you use a retriever"],"answer":1,"why":"RAG wants answers grounded faithfully in the retrieved context, so a deterministic temperature 0 is preferred over varied output."},
+    {"q":"Why must you retrieve using the combined conversation history?","options":["To reduce the number of API calls made","So a follow-up like \"her salary?\" still finds the right person","Because the retriever cannot read single questions","To keep the vector database from growing"],"answer":1,"why":"A follow-up may lack the entity to match (just \"her salary?\"); retrieving on the combined history keeps the earlier name in scope."},
+    {"q":"What does the retriever&#39;s <code>k</code> parameter control?","options":["The embedding dimension of each vector","How many nearest chunks are returned","The temperature of the LLM answer","The chunk size used at ingest time"],"answer":1,"why":"k is the number of nearest chunks retrieved; more k adds context but also noise and cost."},
+    {"q":"(Week 1 recall) The pipeline must resend history each turn because…","options":["Gradio deletes the vector store each call","API calls are stateless; the model has no memory","the retriever forgets its embeddings","temperature 0 disables the context window"],"answer":1,"why":"As in Week 1 Day 4, the LLM is stateless — only what you send (history + retrieved context) is in scope for the answer."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>LangChain — <a href="https://python.langchain.com/docs/tutorials/rag/">RAG tutorial</a> and the
+    <a href="https://python.langchain.com/docs/concepts/retrievers/">retrievers</a> concept guide. They
+    build the exact retriever + LLM loop you used today.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to add source citations to each answer, or fix the multi-turn retrieval
+    bug live? Ask. See the <a href="../reference/glossary.html">Week 5 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0022-day2-chunking-and-vector-stores.html">← Day 2</a>
+    <a href="0024-day4-rag-evaluation.html">Day 4 — Evaluating RAG →</a>
+  </nav>
+
+</div>
+</body>
+</html>

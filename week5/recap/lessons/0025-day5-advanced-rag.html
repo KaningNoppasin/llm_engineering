@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W5 Day 5 — Advanced RAG</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 5 <span class="dot">●</span> Day 5 Recap</p>
+    <h1>Advanced RAG</h1>
+    <p class="subtitle">Semantic chunking, query rewriting, expansion, and re-ranking — 0.73 → 0.91 MRR.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> basic RAG is table stakes; the techniques here are
+    what teams reach for when retrieval "mostly works but not well enough." Knowing the menu — and which
+    lever moved the needle — is senior-level RAG knowledge.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can name the advanced techniques that lifted retrieval from <b>0.73 → 0.91 MRR</b>, and explain
+    why re-ranking and query rewriting help.</p>
+  </div>
+
+  <h2>The upgrade menu</h2>
+  <p>
+    Day 4 gave you a number to beat. Day 5 improves it by fixing retrieval at every stage: better
+    <b>chunks</b> going in, better <b>queries</b> going out, and a <b>re-rank</b> on the way back. Stacked
+    together they took MRR from 0.73 to <b>0.91</b> — the right chunk is now first ~9 times in 10.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>Semantic chunking.</b> Let an LLM split documents on <em>meaning</em> (sections, topics) rather
+      than fixed character counts — chunks become self-contained, so questions map cleanly.</li>
+    <li><b>Document pre-processing.</b> Have an LLM add a <em>headline + summary</em> to each chunk before
+      embedding, making it easier to retrieve.</li>
+    <li><b>Query rewriting.</b> Rewrite the user's question before retrieval (clarify, add context) so it
+      matches the corpus better — fixes the multi-turn problem from Day 3.</li>
+    <li><b>Query expansion.</b> Generate several query variants, retrieve for each, then merge and
+      de-duplicate — casting a wider net.</li>
+    <li><b>Re-ranking.</b> Embedding similarity ≠ true relevance. After retrieval, a cross-encoder or LLM
+      re-scores the candidates and reorders them; in the lesson a key chunk jumped from position 5 to 1.</li>
+    <li><b>GraphRAG</b> models entities and relationships (e.g. employee→manager); useful for relational
+      questions, though metadata often suffices.</li>
+    <li><b>Build without LangChain for control.</b> Native Chroma + OpenAI makes each step explicit;
+      <b>multiprocessing</b> parallelizes chunking (~10× faster ingest). Full pipeline ≈ $0.50 / run on 76 docs.</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-com"># the advanced retrieval flow: rewrite -> expand -> retrieve -> merge -> RE-RANK</span>
+rewritten = <span class="c-fn">rewrite_query</span>(original_q, history)        <span class="c-com"># clarify / add context</span>
+cand = <span class="c-fn">fetch</span>(original_q) + <span class="c-fn">fetch</span>(rewritten)          <span class="c-com"># expansion</span>
+cand = <span class="c-fn">dedupe</span>(cand)
+
+<span class="c-com"># re-rank candidates by ACTUAL relevance to the original question</span>
+<span class="c-kw">def</span> <span class="c-fn">rerank</span>(question, chunks):
+    order = RankOrder.<span class="c-fn">model_validate_json</span>(<span class="c-fn">ask_llm_to_rank</span>(question, chunks)).order
+    <span class="c-kw">return</span> [chunks[i - <span class="c-str">1</span>] <span class="c-kw">for</span> i <span class="c-kw">in</span> order]
+
+best = <span class="c-fn">rerank</span>(original_q, cand)[:<span class="c-str">k</span>]               <span class="c-com"># top-k after reordering</span></code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "Retrieval's fine but answers miss things — what do you try?" — Walk
+    the stages: re-rank the top-k first (cheap, big win), then query rewriting/expansion for recall, then
+    semantic chunking at ingest. Always re-measure against the golden set (Day 4) — stack only what moves MRR.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Final Week 5 quiz — it interleaves Days 2, 4 and a Week 4 idea.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"Why re-rank chunks after retrieving them?","options":["To reduce the number of chunks stored","Embedding similarity is not the same as true relevance","Re-ranking lowers the embedding dimension","It replaces the need for an embedding model"],"answer":1,"why":"Nearest-by-vector isn&#39;t always most relevant; a cross-encoder or LLM re-scores candidates and reorders them, surfacing the best chunk first."},
+    {"q":"What is query expansion?","options":["Making the system prompt longer","Generating several query variants and merging results","Increasing the chunk size at ingest","Adding more documents to the knowledge base"],"answer":1,"why":"Query expansion issues multiple query variants, retrieves for each, then merges and de-duplicates — widening the net for recall."},
+    {"q":"How does semantic chunking differ from fixed-size chunking?","options":["It makes every chunk exactly 500 characters","It splits documents on meaning, not character counts","It stores chunks without embedding them","It removes the need for a vector database"],"answer":1,"why":"Semantic chunking uses an LLM to split on meaningful boundaries (sections/topics) so each chunk is self-contained and matches questions cleanly."},
+    {"q":"What drove the jump from 0.73 to 0.91 MRR?","options":["A single larger embedding model alone","Combining semantic chunking, rewriting, expansion, re-ranking","Switching from Chroma to FAISS","Increasing temperature on the answer model"],"answer":1,"why":"No single trick — the gain came from stacking semantic chunking, document pre-processing, query rewriting/expansion, and re-ranking together."},
+    {"q":"(Week 4 recall) How do you know an advanced technique actually helped?","options":["The answers subjectively feel better to read","Re-measure MRR/judge scores against the golden set","The pipeline runs faster than before","The vector database file gets smaller"],"answer":1,"why":"As in Week 4, you need a measured baseline: re-run the golden-set evaluation and keep only changes that move MRR / judge scores."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>Anthropic — <a href="https://www.anthropic.com/news/contextual-retrieval">Contextual Retrieval</a>
+    (chunk pre-processing + re-ranking, with measured gains). For GraphRAG, Microsoft's
+    <a href="https://microsoft.github.io/graphrag/">GraphRAG</a> docs.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to add a re-ranker to your Day 3 pipeline and measure the lift, or try
+    semantic chunking on your docs? Ask. Everything's in the
+    <a href="../reference/glossary.html">Week 5 glossary</a>, and you can revisit the
+    <a href="0021-day1-rag-and-embeddings.html">Week 5 lessons index</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0024-day4-rag-evaluation.html">← Day 4</a>
+    <a href="../reference/glossary.html">Week 5 glossary →</a>
+  </nav>
+
+</div>
+</body>
+</html>
