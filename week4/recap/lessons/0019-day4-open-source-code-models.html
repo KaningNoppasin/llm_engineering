@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W4 Day 4 — Open-Source Code Models &amp; a Compare UI</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 4 <span class="dot">●</span> Day 4 Recap</p>
+    <h1>Open-source code models &amp; a compare UI</h1>
+    <p class="subtitle">Can open models match frontier on code? Build a UI and find out.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> open code models can be far cheaper and run
+    privately. Wiring several behind one dropdown and benchmarking them on a real task is precisely the
+    "model comparison harness" an AI team needs — and a portfolio-ready build.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can route one conversion function to many models (Ollama, OpenRouter, Groq) and drive them all
+    from a single Gradio dropdown UI.</p>
+  </div>
+
+  <h2>The setup</h2>
+  <p>
+    Same Python→C++ task as Day 3, now with <b>open-source code models</b> (Qwen Coder, DeepSeek Coder,
+    GPT-OSS) reached through three endpoints: <b>Ollama</b> (local), <b>OpenRouter</b> and <b>Groq</b>
+    (APIs). One <code>port(model, python)</code> function dispatches to the right client by model name.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>Pick candidates from a code leaderboard</b> — HF's Big Code Models board + Artificial Analysis.</li>
+    <li><b>One client interface, many backends.</b> Because all three speak the OpenAI API shape (Week 2!),
+      a dict maps each model name to its client; the function looks up and calls.</li>
+    <li><b>Gradio compare UI.</b> <code>gr.Blocks</code> with a Python input box, a C++ output box, a
+      model <b>dropdown</b>, and a Convert button wired via <code>.click(port, inputs, outputs)</code>.</li>
+    <li><b>Surprise result:</b> open <b>GPT-OSS 20B (~238×)</b> beat GPT-5 (~233×) and Claude Sonnet 4.5
+      (~184×) on this task — though still behind Gemini (1440×) and Grok-4 (1060×).</li>
+    <li><b>Bigger ≠ better.</b> GPT-OSS <em>120B</em> underperformed its 20B sibling (~10× slower) because
+      it emitted a bad <code>#pragma</code> that disabled loop unrolling; Qwen 2.5 (7B) failed outright.</li>
+    <li><b>This is a comparison harness.</b> The real product isn't the C++ — it's the repeatable way to
+      pit models against each other on <em>your</em> task.</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-com"># map each model name to the client that serves it</span>
+clients = {
+    <span class="c-str">"qwen2.5-coder"</span>:        ollama,
+    <span class="c-str">"deepseek-coder-v2"</span>:     ollama,
+    <span class="c-str">"qwen/qwen3-coder-30b"</span>:  openrouter,
+    <span class="c-str">"openai/gpt-oss-120b"</span>:   groq,
+}
+
+<span class="c-kw">def</span> <span class="c-fn">port</span>(model, python):
+    client = clients[model]                          <span class="c-com"># dispatch by name</span>
+    r = client.chat.completions.<span class="c-fn">create</span>(model=model, messages=<span class="c-fn">messages_for</span>(python))
+    <span class="c-kw">return</span> r.choices[<span class="c-str">0</span>].message.content.<span class="c-fn">replace</span>(<span class="c-str">"```cpp"</span>, <span class="c-str">""</span>).<span class="c-fn">replace</span>(<span class="c-str">"```"</span>, <span class="c-str">""</span>)
+
+<span class="c-com"># one dropdown drives them all</span>
+<span class="c-kw">with</span> gr.<span class="c-fn">Blocks</span>() <span class="c-kw">as</span> ui:
+    <span class="c-kw">with</span> gr.<span class="c-fn">Row</span>():
+        python = gr.<span class="c-fn">Textbox</span>(label=<span class="c-str">"Python"</span>, lines=<span class="c-str">28</span>)
+        cpp    = gr.<span class="c-fn">Textbox</span>(label=<span class="c-str">"C++"</span>, lines=<span class="c-str">28</span>)
+    model   = gr.<span class="c-fn">Dropdown</span>(<span class="c-fn">list</span>(clients), label=<span class="c-str">"Model"</span>)
+    convert = gr.<span class="c-fn">Button</span>(<span class="c-str">"Convert"</span>)
+    convert.<span class="c-fn">click</span>(port, inputs=[model, python], outputs=[cpp])
+ui.<span class="c-fn">launch</span>()</code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "Are open models good enough?" — For code translation here, the best
+    open model beat two frontier models at a fraction of the cost. The honest answer is "measure it on
+    your task" — sometimes open wins, sometimes it fails outright (Qwen 2.5 did).
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Interleaves a Week 2 idea with today's multi-model harness.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"How does one <code>port()</code> function call several different model backends?","options":["It retrains each model before calling it","A dict maps model name to its API client","It runs every model and averages the C++","Gradio picks the backend automatically"],"answer":1,"why":"A dictionary maps each model name to the client that serves it (Ollama/OpenRouter/Groq); the function looks up and dispatches by name."},
+    {"q":"Why did open GPT-OSS 20B beat its larger 120B sibling here?","options":["The 20B model had a bigger context window","The 120B emitted a bad pragma disabling unrolling","The 120B model was not given the prompt","The 20B model was secretly a frontier model"],"answer":1,"why":"The 120B generated a #pragma that disabled loop unrolling, making it ~10x slower — bigger isn&#39;t automatically better at code."},
+    {"q":"What is the real deliverable of this lesson?","options":["The fastest possible C++ program","A repeatable harness to compare models on your task","A new open-source model you trained","A leaderboard you publish online"],"answer":1,"why":"The value is the comparison harness — a repeatable way to pit candidate models against each other on your own task."},
+    {"q":"What Gradio call wires the Convert button to the function?","options":["button.submit(port, ...) on the textbox","convert.click(port, inputs=[...], outputs=[...])","gr.Interface(port).launch() only","port.bind(convert) before launch"],"answer":1,"why":".click(fn, inputs, outputs) connects a button press to the callback — the gr.Blocks event-wiring from Week 2."},
+    {"q":"(Week 2 recall) Why can Ollama, OpenRouter and Groq share one client style?","options":["They are all owned by the same company","They expose OpenAI-compatible endpoints","They only serve a single shared model","They require the same paid API key"],"answer":1,"why":"All three speak the OpenAI Chat Completions shape (Week 2), so the same client pattern hits any of them by swapping base_url/key."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>Hugging Face — <a href="https://huggingface.co/spaces/bigcode/bigcode-models-leaderboard">Big Code Models Leaderboard</a>,
+    and <a href="https://ollama.com/library">Ollama's model library</a> for the open code models you can pull locally.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to add a "Run" button that compiles and times the C++ in the UI, or pull a
+    code model with Ollama? Ask. See the <a href="../reference/glossary.html">Week 4 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0018-day3-python-to-cpp.html">← Day 3</a>
+    <a href="0020-day5-evaluation-and-rust.html">Day 5 — Evaluation &amp; Rust →</a>
+  </nav>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W4 Day 3 — Python → C++ with Frontier Models</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 4 <span class="dot">●</span> Day 3 Recap</p>
+    <h1>Python → C++ with frontier models</h1>
+    <p class="subtitle">A real business win: rewrite slow code in a fast language, measured by speedup.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> this is the first time you point an LLM at a
+    <em>measurable</em> engineering outcome — make code faster — and compare models on it. "I used the
+    leaderboard to shortlist, then measured the real speedup" is a great interview story.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can prompt a frontier model to port Python to optimized C++, compile and time it, and compare
+    models by the speedup they achieve.</p>
+  </div>
+
+  <h2>The task</h2>
+  <p>
+    Take slow Python (estimating π with a 200-million-term Leibniz series, ~19s) and have an LLM rewrite
+    it as high-performance C++. C++ compiles to native machine code, so the same algorithm runs orders of
+    magnitude faster — and a smart model adds loop unrolling, threading, and CPU-specific flags on top.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>Prompt design for translation.</b> A firm system prompt ("convert Python to high-performance
+      C++; respond with C++ only; identical output, fastest time") + a user prompt carrying the system
+      info, compile command, and source.</li>
+    <li><b>Strip the fences.</b> Models wrap code in <code>```cpp</code>; you remove those markers before
+      writing <code>main.cpp</code>.</li>
+    <li><b>Compile &amp; run natively.</b> <code>clang++ -Ofast -mcpu=native</code> (plus
+      <code>-flto</code>, <code>-DNDEBUG</code>) then time the binary.</li>
+    <li><b>Models optimize differently.</b> On this task: Claude ~148×, GPT-5 ~230× (reliable loop
+      unrolling), Grok-4 ~1060× (aggressive threading), <b>Gemini 2.5 Pro ~1440× (winner)</b> via
+      algorithm simplification + dynamic threading.</li>
+    <li><b>Leaderboard ≠ task winner.</b> Gemini wasn't top of Artificial Analysis yet won <em>this</em>
+      task — proving Day 1's lesson: validate on your own problem.</li>
+    <li><b>Reasoning effort helps.</b> GPT models were called with <code>reasoning_effort="high"</code>
+      for the harder optimization thinking.</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code>system_prompt = <span class="c-str">"Convert this Python to high-performance C++. Respond with C++ only; "</span> \
+                <span class="c-str">"produce identical output in the fastest possible time."</span>
+
+<span class="c-kw">def</span> <span class="c-fn">port</span>(client, model, python):
+    effort = <span class="c-str">"high"</span> <span class="c-kw">if</span> <span class="c-str">"gpt"</span> <span class="c-kw">in</span> model <span class="c-kw">else</span> <span class="c-kw">None</span>
+    r = client.chat.completions.<span class="c-fn">create</span>(
+        model=model, reasoning_effort=effort,
+        messages=[{<span class="c-str">"role"</span>: <span class="c-str">"system"</span>, <span class="c-str">"content"</span>: system_prompt},
+                  {<span class="c-str">"role"</span>: <span class="c-str">"user"</span>,   <span class="c-str">"content"</span>: <span class="c-fn">user_prompt_for</span>(python)}])
+    cpp = r.choices[<span class="c-str">0</span>].message.content.<span class="c-fn">replace</span>(<span class="c-str">"```cpp"</span>, <span class="c-str">""</span>).<span class="c-fn">replace</span>(<span class="c-str">"```"</span>, <span class="c-str">""</span>)
+    <span class="c-kw">with</span> <span class="c-fn">open</span>(<span class="c-str">"main.cpp"</span>, <span class="c-str">"w"</span>) <span class="c-kw">as</span> f: f.<span class="c-fn">write</span>(cpp)
+
+<span class="c-com"># compile to a native binary, then time it</span>
+subprocess.<span class="c-fn">run</span>([<span class="c-str">"clang++"</span>, <span class="c-str">"-std=c++17"</span>, <span class="c-str">"-Ofast"</span>, <span class="c-str">"-mcpu=native"</span>, <span class="c-str">"main.cpp"</span>, <span class="c-str">"-o"</span>, <span class="c-str">"main"</span>])
+subprocess.<span class="c-fn">run</span>([<span class="c-str">"./main"</span>])</code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "Why is the C++ 200× faster — is the model magic?" — No. Most of the
+    win is <em>compiled native code vs an interpreter</em>; the model adds threading, loop unrolling, and
+    <code>-mcpu=native</code> flags. Same algorithm, dramatically less overhead.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Interleaves a Week 1 idea with today's code-translation task.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"Why is the generated C++ so much faster than the original Python?","options":["The model rewrote it with a better algorithm only","Compiled native code beats an interpreter, plus optimizations","C++ uses a larger context window than Python","The model cached the answer from training data"],"answer":1,"why":"The big win is compiled native machine code vs Python&#39;s interpreter; models then add threading, loop unrolling, and CPU-specific flags."},
+    {"q":"What did the Gemini-wins-but-isn&#39;t-top-of-leaderboard result prove?","options":["Leaderboards are completely useless for selection","Validate models on your own task, not just rankings","Gemini is always the best coding model","Open-source models cannot win any task"],"answer":1,"why":"Gemini 2.5 Pro won this specific task despite not topping Artificial Analysis — Day 1&#39;s point: benchmarks shortlist, your own eval decides."},
+    {"q":"Why strip <code>```cpp</code> fences from the model&#39;s reply?","options":["They change the speed of the compiled binary","They are markdown, not valid C++ to compile","The compiler bills extra for code fences","They hide the reasoning tokens from view"],"answer":1,"why":"Models wrap code in markdown fences; you must remove them so main.cpp contains only valid C++ before compiling."},
+    {"q":"What does <code>-mcpu=native</code> (or -march=native) do?","options":["Targets the exact CPU for machine-specific speed","Forces the model to use more reasoning effort","Limits the binary to a single CPU core","Downloads a native build of the model"],"answer":1,"why":"It tells the compiler to optimize for the exact CPU it runs on, exploiting that chip&#39;s instructions (e.g. SIMD) for extra speed."},
+    {"q":"(Week 1 recall) Why pass <code>reasoning_effort=\"high\"</code> for the GPT port?","options":["It makes the response stream faster","Harder optimization benefits from more thinking tokens","It lowers the cost of the API call","It is required to output C++ at all"],"answer":1,"why":"Optimizing code is a hard reasoning task; more reasoning effort (Week 1/Week 2 idea) buys better, faster-running C++."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>The <a href="https://clang.llvm.org/docs/CommandGuide/clang.html">Clang optimization flags</a> reference
+    (<code>-Ofast</code>, <code>-march=native</code>, <code>-flto</code>) — the levers the models pulled.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to try the same port with your own slow Python, or understand what loop
+    unrolling actually does? Ask. See the <a href="../reference/glossary.html">Week 4 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0017-day2-leaderboards.html">← Day 2</a>
+    <a href="0019-day4-open-source-code-models.html">Day 4 — Open-source code models →</a>
+  </nav>
+
+</div>
+</body>
+</html>

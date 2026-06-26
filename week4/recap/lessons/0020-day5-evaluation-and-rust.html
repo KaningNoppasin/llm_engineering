@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W4 Day 5 — Evaluation &amp; the Rust Challenge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 4 <span class="dot">●</span> Day 5 Recap</p>
+    <h1>Evaluation &amp; the Rust challenge</h1>
+    <p class="subtitle">Two kinds of metrics — and why the business one wins.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> the engineers who get promoted connect a model's
+    technical metrics to a <em>business</em> outcome. Knowing the difference — and that perplexity is not
+    revenue — is what turns "I trained a model" into "I moved the number that mattered."
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can name the two categories of model evaluation, define perplexity, and explain why an
+    open-source model swept the harder Rust challenge.</p>
+  </div>
+
+  <h2>The two kinds of evaluation</h2>
+  <p>
+    <b>Technical (model-centric) metrics</b> — loss, cross-entropy, <b>perplexity</b>, accuracy, latency,
+    cost — are precise, fast, and trainable, but can miss the point. <b>Business (outcome) metrics</b> —
+    KPIs, ROI, user satisfaction — are noisier and slower, but they're what you're actually paid to move.
+    <em>Connecting the two is the superpower.</em>
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>Perplexity</b> measures a model's uncertainty about the next token. <b>1 = perfect confidence</b>;
+      perplexity ~100 means roughly 100 equally-likely next tokens. Lower is more certain.</li>
+    <li><b>Technical metrics guide training</b> in real time; <b>business metrics validate</b> that the
+      thing actually works — use both, but optimize for the business outcome.</li>
+    <li><b>Harder task: Python → Rust.</b> Generate 10,000 numbers via an LCG, find the maximum contiguous
+      subarray sum, repeat 20× (Python baseline ~33s).</li>
+    <li><b>Algorithm beats brute force.</b> Winners didn't just translate the naïve O(n²) loop — they
+      recognized the problem and reimplemented <b>Kadane's algorithm</b> (O(n), single pass).</li>
+    <li><b>Rust's safety caught real bugs.</b> Strict typing exposed an integer-overflow (32- vs 64-bit)
+      that C++ would have let slide silently.</li>
+    <li><b>Open-source swept the podium.</b> Only 3 of ~8 models produced correct runnable Rust; all used
+      Kadane's: <b>GPT-OSS 120B (304µs, winner)</b>, Grok-4 (317µs), GPT-OSS 20B (341µs) — about
+      <b>111,000×</b> faster than the Python baseline.</li>
+  </ul>
+
+  <h2>The idea to memorize</h2>
+  <pre><code><span class="c-com"># naive O(n^2) — what slow translations produced</span>
+<span class="c-kw">for</span> i <span class="c-kw">in</span> <span class="c-fn">range</span>(n):
+    current = <span class="c-str">0</span>
+    <span class="c-kw">for</span> j <span class="c-kw">in</span> <span class="c-fn">range</span>(i, n):
+        current += nums[j]
+        best = <span class="c-fn">max</span>(best, current)
+
+<span class="c-com"># Kadane's O(n) — what the WINNING models reinvented (shown in Rust)</span>
+<span class="c-com">//  let mut best = i64::MIN; let mut current = 0;</span>
+<span class="c-com">//  for x in nums { current = max(x, current + x); best = max(best, current); }</span>
+
+<span class="c-com"># compile Rust for speed:</span>
+<span class="c-com">//  rustc main.rs -C opt-level=3 -C target-cpu=native -C lto=fat</span></code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "What does it mean that the win came from the <em>algorithm</em>?" —
+    The biggest speedups weren't from a faster language but from O(n²)→O(n). The best models reasoned
+    about the <em>problem</em>, not just the syntax — and a cheap open model did it best.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Final Week 4 quiz — it interleaves Days 1, 4 and 5.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What is the core difference between technical and business metrics?","options":["Technical metrics are slower and noisier to measure","Technical metrics are precise; business metrics are the goal","Business metrics are only used during training","There is no real difference between the two"],"answer":1,"why":"Technical metrics (loss, perplexity, accuracy) are precise and trainable; business metrics (KPIs, ROI) are noisier but are what you actually need to move."},
+    {"q":"What does a perplexity of 1 indicate?","options":["The model is completely uncertain","The model is perfectly confident in its prediction","There are 100 equally likely next tokens","The model has a context window of one"],"answer":1,"why":"Perplexity 1 = perfect certainty about the next token; higher perplexity means more uncertainty (≈ that many equally-likely options)."},
+    {"q":"Why did the winning Rust solutions run so much faster than Python?","options":["Only because Rust is a compiled language","Compiled native code plus an O(n) algorithm swap","They skipped generating most of the numbers","Rust automatically parallelizes every loop"],"answer":1,"why":"The big win combined compiled native Rust with switching the naive O(n^2) loop to Kadane&#39;s O(n) algorithm — ~111,000x over Python."},
+    {"q":"What did Rust&#39;s strict typing reveal that C++ would have hidden?","options":["A missing import statement in the code","An integer overflow from 32- vs 64-bit types","A syntax error in the system prompt","A slower compile time than expected"],"answer":1,"why":"Rust&#39;s memory/type safety caught an integer overflow (32- vs 64-bit) that C++ would have let pass silently."},
+    {"q":"(Day 4 recall) The Rust challenge result reinforces which lesson?","options":["Frontier models always beat open-source ones","Open models can win — measure on your own task","Bigger models are always more accurate","Leaderboards perfectly predict task performance"],"answer":1,"why":"Open GPT-OSS models swept the podium, echoing Day 4: validate models on your actual task rather than trusting rankings or size."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>Hugging Face — <a href="https://huggingface.co/docs/transformers/en/perplexity">Perplexity explained</a>.
+    For the algorithm, any reference on <a href="https://en.wikipedia.org/wiki/Maximum_subarray_problem">Kadane's algorithm</a>
+    (maximum subarray, O(n)).</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to map a technical metric to a business KPI for a real product, or see
+    Kadane's worked through? Ask. Everything's in the <a href="../reference/glossary.html">Week 4 glossary</a>,
+    and you can revisit the <a href="0016-day1-model-selection-and-benchmarks.html">Week 4 lessons index</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0019-day4-open-source-code-models.html">← Day 4</a>
+    <a href="../reference/glossary.html">Week 4 glossary →</a>
+  </nav>
+
+</div>
+</body>
+</html>

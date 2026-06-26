@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W4 Day 2 — Leaderboards &amp; Commercial Patterns</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 4 <span class="dot">●</span> Day 2 Recap</p>
+    <h1>Leaderboards &amp; commercial patterns</h1>
+    <p class="subtitle">Where to look up models — and the three ways businesses deploy them.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> knowing <em>which</em> leaderboard answers
+    <em>which</em> question — cost, niche skill, contamination, human preference — lets you justify a
+    model choice with evidence. And naming automation vs augmentation vs agentic shows you think about
+    business value, not just tech.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can read an intelligence-vs-cost chart, pick the right leaderboard for a question, and place a
+    product on the automation → augmentation → agentic spectrum.</p>
+  </div>
+
+  <h2>The leaderboard toolkit</h2>
+  <ul class="concepts">
+    <li><b>Artificial Analysis</b> — a composite intelligence score plotted against cost &amp; speed. Aim
+      for the "cheap &amp; smart" quadrant; if a model is beaten on <em>both</em> axes by another, drop it.</li>
+    <li><b>Cost must include reasoning tokens.</b> A heavy reasoner (e.g. Grok-4) can cost 10–20× more
+      per query than its sticker price suggests; GPT-5 scored high yet cheaper by reasoning more efficiently.</li>
+    <li><b>Vellum</b> — a one-stop table of API cost, context window, and speed across providers.</li>
+    <li><b>SEAL</b> — specialized expert benchmarks (tool use, languages, vision, security) for niche tasks.</li>
+    <li><b>LiveBench</b> — contamination-resistant: refreshes questions periodically so models can't have
+      memorized them.</li>
+    <li><b>LM Arena</b> — blind, head-to-head human votes producing <b>Elo</b> ratings (~50k votes). The
+      crowd can't be gamed the way a fixed benchmark can.</li>
+    <li><b>Three commercial patterns:</b> <b>automation</b> (replace repetitive work) → <b>augmentation</b>
+      (human + AI co-pilot) → <b>agentic AI</b> (autonomous, multi-step decisions).</li>
+  </ul>
+
+  <div class="gotcha">
+    <b>How to actually use them:</b> Artificial Analysis to <em>filter</em> on cost/intelligence → SEAL if
+    your task is niche → LiveBench if you distrust contamination → LM Arena for chat-quality consensus.
+    Different questions, different boards.
+  </div>
+
+  <h2>Reading the cost/intelligence chart</h2>
+  <pre><code><span class="c-com"># Mental model, not code: each model is a point</span>
+<span class="c-com">#   Y axis = intelligence (composite benchmark score)</span>
+<span class="c-com">#   X axis = cost per task  (INCLUDING reasoning tokens)</span>
+<span class="c-com">#</span>
+<span class="c-com"># Prefer: high Y, low X  (top-left = cheap & smart)</span>
+<span class="c-com"># Reject: any model another beats on BOTH axes (down & right)</span></code></pre>
+
+  <h2>Test yourself</h2>
+  <p class="note">Interleaves a Week 2 idea with today's leaderboards.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"Which leaderboard is specifically designed to resist data contamination?","options":["Artificial Analysis intelligence index","LiveBench, which refreshes its questions","Vellum&#39;s cost and context table","SEAL specialized expert benchmarks"],"answer":1,"why":"LiveBench periodically refreshes its questions so models cannot have memorized them in training — directly countering contamination."},
+    {"q":"Why must a cost comparison include reasoning tokens?","options":["Reasoning tokens are billed at a discount","Heavy reasoners cost far more per task than sticker price","Input tokens are always free to send","Reasoning tokens change the context window size"],"answer":1,"why":"A model that reasons heavily generates many extra tokens, so real cost-per-task can be 10-20x the headline price — the chart normalizes for this."},
+    {"q":"What makes LM Arena different from a benchmark like MMLU?","options":["It tests only coding ability with rotating tasks","It uses blind human votes to produce Elo ratings","It measures latency rather than correctness","It is run privately by a single model vendor"],"answer":1,"why":"LM Arena collects blind head-to-head human preferences into Elo ratings — crowd judgment that fixed multiple-choice benchmarks can&#39;t capture."},
+    {"q":"Order the three commercial patterns by increasing autonomy.","options":["Agentic, then augmentation, then automation","Automation, then augmentation, then agentic","Augmentation, then automation, then agentic","Automation, then agentic, then augmentation"],"answer":1,"why":"Automation (replace repetitive work) → augmentation (human + AI co-pilot) → agentic AI (autonomous multi-step decisions)."},
+    {"q":"(Week 2 recall) An agentic system differs from a plain chatbot because it…","options":["always uses a larger context window","decomposes a goal into tool/LLM steps autonomously","streams its output token by token","runs only on open-source models"],"answer":1,"why":"As in Week 2 Day 5, agentic AI breaks a goal into coordinated tool/LLM calls with autonomy — the most autonomous of the three commercial patterns."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p><a href="https://artificialanalysis.ai/">Artificial Analysis</a> (intelligence vs cost) and
+    <a href="https://lmarena.ai/">LM Arena</a> (human Elo). Open both and find one "cheap &amp; smart" model for
+    a task you care about.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want help picking a model for a concrete project from these boards, or
+    understanding Elo? Ask. See the <a href="../reference/glossary.html">Week 4 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0016-day1-model-selection-and-benchmarks.html">← Day 1</a>
+    <a href="0018-day3-python-to-cpp.html">Day 3 — Python → C++ →</a>
+  </nav>
+
+</div>
+</body>
+</html>

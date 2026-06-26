@@ -30,7 +30,11 @@
 - **Week 3 recap: done** (lessons 0011–0015, `week3/recap/`) — open-source/Hugging Face week:
   HF + Colab GPUs, pipelines, tokenizers, quantization + model internals, audio→minutes capstone.
   See [week3 learning record](../../week3/recap/learning-records/0003-week3-open-source.md).
-- **Next:** after spacing, a mixed Week 1–3 exam; then the **Week 4** recap.
+- **Week 4 recap: done** (lessons 0016–0020, `week4/recap/`) — model selection & evaluation:
+  benchmarks (Chinchilla/GPQA/MMLU-Pro/HLE), leaderboards, Python→C++/Rust code-gen, frontier vs
+  open, technical vs business metrics. Days 1–2 had no notebooks (conceptual). See
+  [week4 learning record](../../week4/recap/learning-records/0004-week4-selection-and-eval.md).
+- **Next:** after spacing, a mixed Week 1–4 exam; then the **Week 5** recap (RAG).
 
 ## Quiz authoring rule (learned the hard way)
 - Inside `data-quiz='...'` JSON, every apostrophe MUST be the entity `&#39;` — a raw `'`

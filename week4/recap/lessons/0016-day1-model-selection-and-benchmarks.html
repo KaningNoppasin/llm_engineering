@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W4 Day 1 — Choosing a Model &amp; Reading Benchmarks</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 4 <span class="dot">●</span> Day 1 Recap</p>
+    <h1>Choosing a model &amp; reading benchmarks</h1>
+    <p class="subtitle">"Which LLM is best?" is the wrong question. Here's the right one.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> "which model should we use, and why?" is asked in
+    every AI role. Answering it with a <em>process</em> — basics first, benchmarks second, your own task
+    last — is exactly the judgment that gets an AI engineer hired.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can run the two-phase model-selection workflow and explain why a high benchmark score is
+    "the first indication, not the only indication."</p>
+  </div>
+
+  <h2>The selection workflow</h2>
+  <p>
+    There is no single "best" model — only the best <em>for this task</em>. The course's process:
+    <b>1) filter by basics</b> (open vs closed, context window, cost, speed, license, knowledge cutoff),
+    then <b>2) compare benchmarks</b> to shortlist, then <b>3) validate on your own problem</b>.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>Phase 1 — the basics.</b> Parameters, context window, cost, speed, license, knowledge cutoff.
+      These rule models in or out before you ever look at a score.</li>
+    <li><b>Chinchilla scaling law.</b> Compute-optimal training pairs parameters with data at roughly
+      <b>~20 training tokens per parameter</b>; doubling params wants ~double the data. (Less central now
+      that compression, RAG, and reasoning let small models punch above their weight.)</li>
+    <li><b>GPQA</b> — 448 PhD-level science Q&amp;A. PhDs score ~65%, non-PhDs with Google ~34%.</li>
+    <li><b>MMLU-Pro</b> replaced the saturated, ambiguous MMLU: 10 options instead of 4, harder questions.</li>
+    <li><b>HLE (Humanity's Last Exam)</b> — ~2,500 deliberately superhuman questions; models scored ~2–3%
+      at release. Other names: AMC (math), LiveCodeBench (rotating coding problems), MUSE (reasoning).</li>
+    <li><b>Benchmarks have fatal flaws:</b> <em>data contamination</em> (test questions leak into training),
+      <em>overfitting</em> to a single metric, narrow scope, and saturation. Apple's experiment — changing
+      facts but not intent — tanked scores, proving memorization.</li>
+    <li><b>Reasoning amplifies results.</b> Forcing a model to explain before answering (e.g. the Connect
+      Four leaderboard) dramatically improves it — direct prediction fails.</li>
+  </ul>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "Why not just pick the top of the leaderboard?" — Because of
+    contamination and overfitting: a model tuned to ace GPQA may collapse when the questions are
+    slightly altered. Benchmarks <em>start</em> your shortlist; your own eval ends it.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">One question reaches back to Week 1 — interleaving is deliberate.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What is the right first question when selecting an LLM?","options":["Which model has the most parameters overall?","Which model is right for this specific task?","Which model tops the most leaderboards?","Which model is the cheapest to run at scale?"],"answer":1,"why":"There is no absolute best model — selection is task-dependent. You filter by the basics for your task, then compare benchmarks."},
+    {"q":"What does the Chinchilla scaling law say, in one line?","options":["More parameters always beat more training data","Pair params with data, ~20 tokens per parameter","Halving parameters doubles inference speed","Bigger context windows require bigger models"],"answer":1,"why":"Chinchilla found compute-optimal training scales params and data together (~20 tokens/param); doubling params wants ~double the data."},
+    {"q":"Why was MMLU replaced by MMLU-Pro?","options":["MMLU tested only coding, not reasoning","MMLU was saturated and had ambiguous questions","MMLU was secret and could not be audited","MMLU only worked on open-source models"],"answer":1,"why":"MMLU got too easy (models saturated it) and had ambiguous items; MMLU-Pro uses 10 options and harder questions."},
+    {"q":"What is benchmark \"data contamination\"?","options":["Corrupted files in the benchmark dataset","Test questions leaking into the training data","Mixing two benchmarks into one score","Running a benchmark on the wrong GPU"],"answer":1,"why":"Contamination is when benchmark questions appear in a model&#39;s training data, so high scores reflect memorization, not capability."},
+    {"q":"(Week 1 recall) Why does forcing a model to reason first help on hard tasks?","options":["It reduces the number of tokens billed","Intermediate thinking improves the final answer","It switches the model to a bigger size","It disables hallucination entirely"],"answer":1,"why":"As in Week 1, reasoning/thinking tokens before the answer raise accuracy on hard problems — the Connect Four leaderboard showed direct prediction failing."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>Hoffmann et al., <a href="https://arxiv.org/abs/2203.15556"><i>Training Compute-Optimal Large Language Models</i></a>
+    (the Chinchilla paper, 2022). For benchmarks, the <a href="https://github.com/idavidrein/gpqa">GPQA</a> and
+    <a href="https://agi.safe.ai/">Humanity's Last Exam</a> pages.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want a checklist for filtering models for a real project, or a deeper look at
+    why a benchmark saturates? Ask. Terms live in the <a href="../reference/glossary.html">Week 4 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <span></span>
+    <a href="0017-day2-leaderboards.html">Day 2 — Leaderboards →</a>
+  </nav>
+
+</div>
+</body>
+</html>

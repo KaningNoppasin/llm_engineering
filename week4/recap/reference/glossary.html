@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 4 Glossary — LLM Engineering</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 4 <span class="dot">●</span> Reference</p>
+    <h1>Week 4 glossary</h1>
+    <p class="subtitle">Model selection &amp; evaluation: benchmarks, leaderboards, code-gen, metrics. Print &amp; pin.</p>
+  </header>
+
+  <p class="note">New terms from Week 4. See also the
+  <a href="../../../week1/recap/reference/glossary.html">Week 1</a>,
+  <a href="../../../week2/recap/reference/glossary.html">Week 2</a>, and
+  <a href="../../../week3/recap/reference/glossary.html">Week 3</a> glossaries.</p>
+
+  <table>
+    <thead><tr><th>Term</th><th>Meaning</th><th>Day</th></tr></thead>
+    <tbody>
+      <tr><td><b>Model selection (2-phase)</b></td><td>Filter by basics (cost/context/speed/license), then compare benchmarks, then validate on your task.</td><td>1</td></tr>
+      <tr><td><b>Chinchilla scaling law</b></td><td>Compute-optimal training pairs params with data (~20 tokens/param); doubling params wants ~2× data.</td><td>1</td></tr>
+      <tr><td><b>GPQA</b></td><td>448 PhD-level science Q&amp;A; PhDs ~65%, non-PhD+Google ~34%.</td><td>1</td></tr>
+      <tr><td><b>MMLU-Pro</b></td><td>Harder successor to MMLU: 10 options, de-ambiguated, contamination-aware.</td><td>1</td></tr>
+      <tr><td><b>HLE</b></td><td>Humanity's Last Exam — ~2,500 superhuman-hard questions; models ~2–3% at release.</td><td>1</td></tr>
+      <tr><td><b>LiveCodeBench</b></td><td>Coding benchmark with rotating problems to resist contamination.</td><td>1</td></tr>
+      <tr><td><b>Data contamination</b></td><td>Benchmark questions leaking into training data, inflating scores via memorization.</td><td>1</td></tr>
+      <tr><td><b>Overfitting (to a benchmark)</b></td><td>Repeatedly picking models by one metric, optimizing the metric not real capability.</td><td>1</td></tr>
+      <tr><td><b>Artificial Analysis</b></td><td>Leaderboard plotting composite intelligence vs cost &amp; speed; aim for cheap &amp; smart.</td><td>2</td></tr>
+      <tr><td><b>Vellum</b></td><td>One-stop table of API cost, context window, and speed across providers.</td><td>2</td></tr>
+      <tr><td><b>SEAL</b></td><td>Specialized expert benchmarks (tool use, languages, vision, security).</td><td>2</td></tr>
+      <tr><td><b>LiveBench</b></td><td>Contamination-resistant leaderboard that refreshes its questions.</td><td>2</td></tr>
+      <tr><td><b>LM Arena</b></td><td>Blind head-to-head human votes → Elo ratings; crowd judgment, hard to game.</td><td>2</td></tr>
+      <tr><td><b>Elo rating</b></td><td>Relative skill score from pairwise wins/losses (here, from human preference votes).</td><td>2</td></tr>
+      <tr><td><b>Automation / Augmentation / Agentic</b></td><td>The three commercial patterns by rising autonomy: replace work → co-pilot → autonomous decisions.</td><td>2</td></tr>
+      <tr><td><b>Code translation prompt</b></td><td>System prompt ("convert to high-performance C++, code only") + user prompt with source &amp; compile info.</td><td>3</td></tr>
+      <tr><td><b>Native compilation</b></td><td>Compiling to machine code (clang++ <code>-Ofast -mcpu=native</code>) — the main reason C++ beats Python.</td><td>3</td></tr>
+      <tr><td><b>-mcpu / -march=native</b></td><td>Compiler flag targeting the exact CPU for machine-specific speedups (SIMD etc.).</td><td>3</td></tr>
+      <tr><td><b>Speedup factor</b></td><td>Baseline time ÷ optimized time; the business metric for this task (e.g. 230×, 1440×).</td><td>3, 5</td></tr>
+      <tr><td><b>Model dispatch (dict)</b></td><td>Mapping model name → API client so one function routes to Ollama/OpenRouter/Groq.</td><td>4</td></tr>
+      <tr><td><b>Compare harness</b></td><td>A repeatable Gradio UI / function to benchmark many models on your own task.</td><td>4</td></tr>
+      <tr><td><b>GPT-OSS / Qwen Coder / DeepSeek Coder</b></td><td>Open-source code models; here open GPT-OSS beat some frontier models on the task.</td><td>4, 5</td></tr>
+      <tr><td><b>Technical metrics</b></td><td>Model-centric: loss, cross-entropy, perplexity, accuracy, latency, cost. Precise, trainable.</td><td>5</td></tr>
+      <tr><td><b>Business metrics</b></td><td>Outcome-centric: KPIs, ROI, user satisfaction. The real goal; noisier, slower.</td><td>5</td></tr>
+      <tr><td><b>Perplexity</b></td><td>Model's uncertainty over the next token; 1 = perfect confidence, higher = less certain.</td><td>5</td></tr>
+      <tr><td><b>Kadane's algorithm</b></td><td>O(n) single-pass maximum-subarray; the winning models reinvented it instead of naive O(n²).</td><td>5</td></tr>
+    </tbody>
+  </table>
+
+  <p class="teacher">
+    <b>Your reference doc — it outlives the lessons.</b> Fuzzy on a row? Ask me to re-teach just that one.
+    Back to <a href="../lessons/0016-day1-model-selection-and-benchmarks.html">Week 4 Day 1</a>.
+  </p>
+
+</div>
+</body>
+</html>
