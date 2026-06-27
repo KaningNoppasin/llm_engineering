@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W6 Day 5 — Fine-Tuning (and When It Fails)</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 6 <span class="dot">●</span> Day 5 Recap</p>
+    <h1>Fine-tuning — and when it fails</h1>
+    <p class="subtitle">The counterintuitive lesson: fine-tuning a frontier model made it <em>worse</em>.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> everyone wants to say "we fine-tuned a model." The
+    senior insight is knowing <em>when not to</em>. Today's result — fine-tuning a capable model on this
+    task hurt it — is the kind of judgment that separates real engineers from résumé-driven ones.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can run a supervised fine-tuning job via the OpenAI API, and explain when fine-tuning helps
+    versus when prompting/RAG (or a from-scratch model) is the better tool.</p>
+  </div>
+
+  <h2>What fine-tuning is for</h2>
+  <p>
+    <b>Supervised fine-tuning (SFT)</b> trains a model on input→output examples to change its
+    <em>behavior</em> — tone, format, fixing specific failures — <b>not</b> to pour new knowledge into an
+    already-capable model. When you fine-tune via the OpenAI API, it trains small <b>LoRA</b> adapters
+    behind the scenes, not the whole model.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>The data is JSONL chat format.</b> Each line is a <code>{"messages": [user, assistant]}</code>
+      example — the assistant message is the target answer.</li>
+    <li><b>Three stages.</b> Upload the training file → create &amp; monitor the fine-tuning job (watch the
+      loss) → test the resulting custom model variant.</li>
+    <li><b>Start small.</b> OpenAI suggests <b>50–100 examples</b>, one epoch — only scale up if few-shot
+      prompting genuinely fails.</li>
+    <li><b>The result: it got worse.</b> Fine-tuning gpt-4o-mini on 20k price examples gave <b>$75.91</b>
+      MAE — worse than the untuned model (~$67). The model already knew prices; the examples added noise.</li>
+    <li><b>Use SFT for style, not knowledge.</b> Tone/voice, strict output format, fixing a recurring
+      mistake — yes. Teaching domain facts to a strong model — usually no.</li>
+    <li><b>For knowledge, reach for RAG/prompting</b> (Week 5) — or, if you own the problem, train your
+      <em>own</em> model from scratch.</li>
+    <li><b>The redemption.</b> A specialized <b>289M-parameter</b> deep net trained from scratch on all
+      800k items hit <b>$46.49</b> MAE — beating Claude Opus and nearly matching GPT-5.1. Specialization
+      beats scale when the domain is narrow.</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-com"># 1. each training example is a chat-format pair</span>
+<span class="c-kw">def</span> <span class="c-fn">messages_for</span>(item):
+    <span class="c-kw">return</span> [{<span class="c-str">"role"</span>: <span class="c-str">"user"</span>,      <span class="c-str">"content"</span>: <span class="c-str">f"Estimate the price:\n{item.summary}"</span>},
+            {<span class="c-str">"role"</span>: <span class="c-str">"assistant"</span>, <span class="c-str">"content"</span>: <span class="c-str">f"${item.price:.2f}"</span>}]
+
+<span class="c-com"># 2. upload the JSONL file, then start the job</span>
+f = openai.files.<span class="c-fn">create</span>(file=<span class="c-fn">open</span>(<span class="c-str">"train.jsonl"</span>, <span class="c-str">"rb"</span>), purpose=<span class="c-str">"fine-tune"</span>)
+job = openai.fine_tuning.jobs.<span class="c-fn">create</span>(
+    training_file=f.id, model=<span class="c-str">"gpt-4.1-nano-2025-04-14"</span>,
+    hyperparameters={<span class="c-str">"n_epochs"</span>: <span class="c-str">1</span>}, suffix=<span class="c-str">"pricer"</span>)
+
+<span class="c-com"># 3. monitor the run</span>
+openai.fine_tuning.jobs.<span class="c-fn">list_events</span>(fine_tuning_job_id=job.id, limit=<span class="c-str">10</span>)</code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "Fine-tune, RAG, or prompt?" — <b>Prompt/few-shot</b> first (cheapest).
+    <b>RAG</b> when you need private/fresh <em>knowledge</em>. <b>Fine-tune</b> to lock in <em>behavior</em>
+    (style/format) or when prompting plateaus. Fine-tuning a strong model to add facts often backfires —
+    exactly what happened today.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Final Week 6 quiz — it interleaves Days 1, 4 and a Week 5 idea.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What is supervised fine-tuning (SFT) best used for?","options":["Adding new factual knowledge to a model","Changing behavior: tone, format, fixing failures","Compressing a model to run on a CPU","Replacing the need for any training data"],"answer":1,"why":"SFT adapts behavior (style, format, specific fixes); it is poor at teaching new domain knowledge to an already-capable model."},
+    {"q":"Why did fine-tuning gpt-4o-mini make price prediction worse?","options":["The training file was in the wrong format","The model already knew prices; examples added noise","The learning rate was set far too low","It was trained on the test set by mistake"],"answer":1,"why":"The frontier model already had strong price knowledge; 20k narrow examples introduced overfitting noise instead of new signal."},
+    {"q":"For a knowledge-intensive task, what beats fine-tuning a frontier model?","options":["RAG or prompting with examples","Doubling the number of fine-tune epochs","Using a smaller batch size","Removing the validation set"],"answer":1,"why":"RAG/prompting injects knowledge without retraining; fine-tuning a capable model to add facts often hurts more than it helps."},
+    {"q":"How did a 289M-param net beat models with vastly more parameters?","options":["It secretly called a frontier API","Specialization: trained only on product pricing","It used a far larger context window","It memorized the public test set"],"answer":1,"why":"All its capacity went to one narrow domain (pricing) trained on 800k examples — none wasted on unrelated abilities like writing poetry."},
+    {"q":"(Week 5 recall) What format is OpenAI fine-tuning training data in?","options":["A CSV of features and labels","JSONL chat-format message pairs","A vector database of embeddings","Raw unstructured product text"],"answer":1,"why":"Each line is a {messages:[user, assistant]} chat example — the same JSONL idea seen in batch mode, with the assistant message as the target."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>OpenAI — <a href="https://platform.openai.com/docs/guides/fine-tuning">Fine-tuning guide</a> (JSONL
+    format, jobs, and crucially <em>when to fine-tune vs prompt vs RAG</em>).</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to decide fine-tune vs RAG vs prompt for a real project, or read a
+    fine-tuning loss curve? Ask. Everything's in the <a href="../reference/glossary.html">Week 6 glossary</a>,
+    and you can revisit the <a href="0026-day1-data-curation.html">Week 6 lessons index</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0029-day4-neural-nets-vs-frontier.html">← Day 4</a>
+    <a href="../reference/glossary.html">Week 6 glossary →</a>
+  </nav>
+
+</div>
+</body>
+</html>

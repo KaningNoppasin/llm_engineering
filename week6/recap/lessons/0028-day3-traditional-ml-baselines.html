@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W6 Day 3 — Traditional ML Baselines</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 6 <span class="dot">●</span> Day 3 Recap</p>
+    <h1>Traditional ML baselines</h1>
+    <p class="subtitle">From a random guess to XGBoost — always have a number to beat.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> reaching for an LLM first is a junior move. The
+    engineer who builds a cheap baseline — and sometimes ships it — saves money and earns trust.
+    scikit-learn fluency is still expected in most ML interviews.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can turn product text into features with Bag-of-Words and train a ladder of baselines
+    (linear → Random Forest → XGBoost), each measured by the same error metric.</p>
+  </div>
+
+  <h2>Why baselines first</h2>
+  <p>
+    Before any fancy model, you build a <b>baseline</b> — even a random guess — so every later approach
+    has a number to beat. The day climbs a ladder, each rung a real model, watching the <b>mean
+    absolute error (MAE)</b> in dollars fall.
+  </p>
+
+  <h2>The ladder (MAE in $, lower is better)</h2>
+  <table>
+    <thead><tr><th>Model</th><th>What it does</th><th>MAE</th></tr></thead>
+    <tbody>
+      <tr><td>Random pricer</td><td>Guesses 1–999, ignores the text</td><td>$382</td></tr>
+      <tr><td>Constant pricer</td><td>Always guesses the average price ($140)</td><td>$106</td></tr>
+      <tr><td>Linear regression (weak features)</td><td>Weight + text length only</td><td>$102</td></tr>
+      <tr><td>Bag-of-Words + Linear regression</td><td>2,000 word-count features</td><td>$77</td></tr>
+      <tr><td>Random Forest</td><td>100 trees, averaged</td><td>$72</td></tr>
+      <tr><td><b>XGBoost</b></td><td>Sequential trees correcting errors</td><td><b>$68</b></td></tr>
+    </tbody>
+  </table>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>The constant baseline is sneaky-good.</b> Always guessing the average ($106 MAE) crushes random
+      guessing ($382) — the task has a natural center of mass.</li>
+    <li><b>Features &gt; algorithm.</b> The big jump ($102 → $77) came from better <em>features</em>
+      (word counts), not a fancier model.</li>
+    <li><b>Bag-of-Words / CountVectorizer</b> turns text into numbers by counting the top ~2,000 words
+      (dropping stop-words like "the"). Each product becomes a 2,000-number vector.</li>
+    <li><b>Random Forest</b> = many decision trees on random data/feature subsets, averaged — robust,
+      parallel.</li>
+    <li><b>XGBoost</b> builds trees <em>sequentially</em>, each correcting the previous one's errors —
+      usually faster and a bit better.</li>
+    <li><b>One evaluation harness.</b> Every model is scored the same way (MAE, plus a ŷ-vs-y scatter and
+      R²) so comparisons are fair.</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-kw">from</span> sklearn.feature_extraction.text <span class="c-kw">import</span> CountVectorizer
+<span class="c-kw">from</span> sklearn.linear_model <span class="c-kw">import</span> LinearRegression
+
+<span class="c-com"># text -> 2000-word feature vectors</span>
+vec = <span class="c-fn">CountVectorizer</span>(max_features=<span class="c-str">2000</span>, stop_words=<span class="c-str">"english"</span>)
+X = vec.<span class="c-fn">fit_transform</span>(documents)
+
+<span class="c-com"># every sklearn model: create -> fit -> predict</span>
+model = <span class="c-fn">LinearRegression</span>()        <span class="c-com"># or RandomForestRegressor(), XGBRegressor()</span>
+model.<span class="c-fn">fit</span>(X, prices)
+pred = model.<span class="c-fn">predict</span>(new_X)
+
+<span class="c-fn">evaluate</span>(model, test_set)         <span class="c-com"># MAE + R^2, same harness for all</span></code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "What's R²?" — 0 means no better than guessing the average, 1 is
+    perfect, <em>negative</em> means worse than the average baseline. It tells you whether your model
+    captures the trend, while MAE tells you how far off in dollars.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Interleaves a Week 5 idea with today's baselines.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"Why build a baseline model before anything fancy?","options":["To skip the data-cleaning step","To have a number every later model must beat","Because LLMs cannot do regression","To avoid using scikit-learn entirely"],"answer":1,"why":"A baseline (even random guessing) gives a benchmark; without it you can&#39;t prove a complex model actually improves anything."},
+    {"q":"What does CountVectorizer produce from text?","options":["A single sentiment score per product","A vector counting the most common words","An embedding from a neural network","The product&#39;s price directly"],"answer":1,"why":"Bag-of-Words / CountVectorizer turns each document into a vector of counts over the top ~2,000 words (minus stop-words)."},
+    {"q":"What drove the big error drop from $102 to $77 MAE?","options":["A much larger neural network","Better features (word counts), not a fancier model","Removing the test set from evaluation","Switching from dollars to log prices"],"answer":1,"why":"Same simple linear model, but rich Bag-of-Words features — feature quality matters more than the algorithm for traditional ML."},
+    {"q":"How does XGBoost differ from Random Forest?","options":["It trains one giant tree only","It builds trees sequentially, each fixing prior errors","It ignores the features entirely","It is a type of neural network"],"answer":1,"why":"Random Forest averages many independent trees; XGBoost adds trees one at a time, each correcting the residual errors of the last."},
+    {"q":"(Week 5 recall) Bag-of-Words differs from a vector embedding because it…","options":["captures deep semantic meaning of text","counts words without understanding meaning","requires a GPU to compute","can only handle one document at a time"],"answer":1,"why":"Bag-of-Words is raw word counts; embeddings (Week 5) are learned vectors that capture meaning so synonyms land near each other."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>scikit-learn — <a href="https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.CountVectorizer.html">CountVectorizer</a>
+    and the <a href="https://scikit-learn.org/stable/supervised_learning.html">supervised learning guide</a>;
+    <a href="https://xgboost.readthedocs.io/">XGBoost docs</a>.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to understand why a decision tree splits where it does, or tune
+    XGBoost? Ask. See the <a href="../reference/glossary.html">Week 6 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0027-day2-batch-preprocessing.html">← Day 2</a>
+    <a href="0029-day4-neural-nets-vs-frontier.html">Day 4 — Neural nets vs frontier →</a>
+  </nav>
+
+</div>
+</body>
+</html>

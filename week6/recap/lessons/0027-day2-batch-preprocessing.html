@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W6 Day 2 — The 5-Step Process &amp; Batch Processing</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 6 <span class="dot">●</span> Day 2 Recap</p>
+    <h1>The 5-step process &amp; batch processing</h1>
+    <p class="subtitle">A disciplined path from business problem to production — and cheap bulk inference.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> a method for taking an AI problem from "understand"
+    to "in production" is what turns a coder into an AI <em>engineer</em>. And batch processing —
+    22,000 LLM calls for under $1 — is the kind of cost instinct that makes you valuable on a team.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can name the 5-step process for applying LLMs to a business problem, and run a cheap bulk
+    job via a JSONL batch API.</p>
+  </div>
+
+  <h2>The 5-step process</h2>
+  <p>
+    A repeatable way to apply AI to a real problem: <b>Understand → Prepare → Select/Customize → Apply →
+    Productionize.</b> Start from the business requirement and a success metric — not "let's build an
+    agent." Build a non-LLM baseline in <em>Prepare</em> so you can prove you actually improved.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>Understand first.</b> Pin down the problem and how you'll measure success before choosing
+      any architecture.</li>
+    <li><b>Prepare = data + baseline.</b> Clean the data and build a simple baseline (Day 3) to beat.</li>
+    <li><b>LLMs can pre-process data.</b> Turn messy scraped descriptions into tight structured fields
+      (title / category / brand / details) with a system prompt — annotation that used to need humans.</li>
+    <li><b>Batch mode.</b> Queue many requests in a <b>JSONL</b> file (one JSON object per line), submit
+      asynchronously with a completion window, fetch results later. Providers give ~<b>50% off</b> vs
+      synchronous calls.</li>
+    <li><b>The economics.</b> ~<b>22,000 requests for under $1</b> on Groq batch mode — pennies per
+      thousand for small open models.</li>
+    <li><b>Match results by <code>custom_id</code>.</b> Each request carries an ID so you can line up
+      outputs with inputs when the batch returns.</li>
+    <li><b>Productionize = MLOps.</b> Step 5 is ongoing: monitor for <b>model drift</b> (real data
+      diverges from training data over time) and retrain/evaluate continuously.</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-com"># 1. write a JSONL batch file — one request object per line</span>
+<span class="c-kw">def</span> <span class="c-fn">to_jsonl</span>(item):
+    body = {<span class="c-str">"model"</span>: <span class="c-str">"openai/gpt-oss-20b"</span>,
+            <span class="c-str">"messages"</span>: [{<span class="c-str">"role"</span>: <span class="c-str">"system"</span>, <span class="c-str">"content"</span>: SYS},
+                         {<span class="c-str">"role"</span>: <span class="c-str">"user"</span>, <span class="c-str">"content"</span>: item.full}]}
+    <span class="c-kw">return</span> json.<span class="c-fn">dumps</span>({<span class="c-str">"custom_id"</span>: <span class="c-fn">str</span>(item.id), <span class="c-str">"method"</span>: <span class="c-str">"POST"</span>,
+                       <span class="c-str">"url"</span>: <span class="c-str">"/v1/chat/completions"</span>, <span class="c-str">"body"</span>: body})
+
+<span class="c-com"># 2. upload -> submit batch -> retrieve when done</span>
+fid = groq.files.<span class="c-fn">create</span>(file=<span class="c-fn">open</span>(<span class="c-str">"batch.jsonl"</span>, <span class="c-str">"rb"</span>), purpose=<span class="c-str">"batch"</span>).id
+bid = groq.batches.<span class="c-fn">create</span>(input_file_id=fid, endpoint=<span class="c-str">"/v1/chat/completions"</span>,
+                          completion_window=<span class="c-str">"24h"</span>).id
+out = groq.files.<span class="c-fn">content</span>(groq.batches.<span class="c-fn">retrieve</span>(bid).output_file_id)</code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "When do you use batch vs synchronous calls?" — Batch when latency
+    doesn't matter and volume is high (data prep, bulk labeling, offline scoring): you trade immediacy
+    for ~half the cost. Synchronous for interactive, user-facing requests.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Interleaves a Week 4 idea with today's process &amp; batch mechanics.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What is the first step of the 5-step process?","options":["Pick the biggest available model","Understand the problem and success metric","Fine-tune a frontier model immediately","Deploy a Gradio UI to production"],"answer":1,"why":"You start by understanding the business problem and how success is measured — architecture decisions come later."},
+    {"q":"Why is batch mode about 50% cheaper than synchronous calls?","options":["It uses a smaller model automatically","You queue requests for asynchronous bulk processing","It skips the system prompt to save tokens","It runs entirely on your local machine"],"answer":1,"why":"Batch mode lets the provider process queued requests efficiently within a completion window, so they discount it versus per-call synchronous use."},
+    {"q":"What is the JSONL format?","options":["A single large JSON array of all requests","One complete JSON object per line","A compressed binary request format","A CSV with JSON in one column"],"answer":1,"why":"JSON Lines puts one JSON object on each line, so large batches stream line-by-line."},
+    {"q":"What is the <code>custom_id</code> on each batch request for?","options":["To authenticate the request to the API","To match each result back to its input","To set the model used for that line","To order the lines alphabetically"],"answer":1,"why":"Results may return out of order; the custom_id lets you line each output up with the item that produced it."},
+    {"q":"(Week 4 recall) \"Model drift\" in production means…","options":["The model file slowly corrupts on disk","Real-world data diverges from training data over time","The GPU gradually loses memory capacity","The context window shrinks with usage"],"answer":1,"why":"Drift is performance decay as live data diverges from the training distribution — handled by continuous evaluation and retraining (the productionize step)."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>OpenAI — <a href="https://platform.openai.com/docs/guides/batch">Batch API guide</a> (the JSONL
+    request format and the upload → submit → retrieve flow, mirrored by Groq).</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to estimate the cost of a bulk job before running it, or design the
+    pre-processing system prompt? Ask. See the <a href="../reference/glossary.html">Week 6 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0026-day1-data-curation.html">← Day 1</a>
+    <a href="0028-day3-traditional-ml-baselines.html">Day 3 — ML baselines →</a>
+  </nav>
+
+</div>
+</body>
+</html>

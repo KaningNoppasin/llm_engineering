@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W6 Day 1 — Curating a Training Dataset</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 6 <span class="dot">●</span> Day 1 Recap</p>
+    <h1>Curating a training dataset</h1>
+    <p class="subtitle">The capstone begins: predict a product's price from its description.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> the unglamorous truth of AI jobs is that
+    <em>data work</em> drives results more than model choice. Curating a clean, balanced, leak-free
+    dataset is a core, hireable skill — and it's where this week's capstone lives or dies.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can take a messy public dataset, filter and balance it, split it leak-free, and push the
+    curated result to the Hugging Face hub.</p>
+  </div>
+
+  <h2>The capstone: "The Price is Right"</h2>
+  <p>
+    The goal for Weeks 6–8 is a <b>regression</b> task: predict a product's price from its text
+    description, using Amazon product data. Today is all about building the dataset that everything
+    else will be measured against.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>Generalization is the whole game.</b> A model is good only if it predicts well on
+      <em>unseen</em> data — learning patterns, not memorizing examples.</li>
+    <li><b>Fine-tuning ≠ pretraining.</b> You take a pre-trained model and train it further on your data
+      (transfer learning) — vastly cheaper than the millions it costs to train from scratch.</li>
+    <li><b>Data quality &gt; hyperparameter tuning.</b> Curating the dataset usually moves the needle
+      more than fiddling with the model. Spend the effort here.</li>
+    <li><b>Filter ruthlessly.</b> Keep items with a real price, descriptions ~600–4,000 chars, prices in
+      a sane range ($0.50–$999.49). Junk in = junk predictions.</li>
+    <li><b>Fix distribution skew.</b> The data skews cheap (and toward Automotive). <b>Weighted
+      sampling</b> (e.g. weight by price, down-weight overrepresented categories) rebalances it so the
+      model sees the full range.</li>
+    <li><b>Remove duplicates to prevent leakage.</b> The same item in train and test inflates your
+      validation score and hides overfitting — <em>data leakage</em> is a classic, costly bug.</li>
+    <li><b>Three splits.</b> Train (learn), validation (tune), test (held in reserve, touched last).
+      Here: ~800k / 10k / 10k (full), or 20k / 1k / 1k (lite).</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-kw">from</span> datasets <span class="c-kw">import</span> load_dataset
+<span class="c-kw">import</span> numpy <span class="c-kw">as</span> np
+
+<span class="c-com"># 1. load + filter</span>
+data = <span class="c-fn">load_dataset</span>(<span class="c-str">"McAuley-Lab/Amazon-Reviews-2023"</span>, <span class="c-str">"raw_meta_Appliances"</span>, split=<span class="c-str">"full"</span>)
+items = [<span class="c-fn">parse</span>(d) <span class="c-kw">for</span> d <span class="c-kw">in</span> data <span class="c-kw">if</span> <span class="c-str">0.5</span> &lt;= <span class="c-fn">price</span>(d) &lt;= <span class="c-str">999.49</span>]
+
+<span class="c-com"># 2. weighted sampling to balance the price distribution</span>
+prices = np.<span class="c-fn">array</span>([it.price <span class="c-kw">for</span> it <span class="c-kw">in</span> items])
+weights = prices ** <span class="c-str">2</span>                          <span class="c-com"># favour pricier items</span>
+weights[categories == <span class="c-str">"Automotive"</span>] *= <span class="c-str">0.05</span>   <span class="c-com"># penalise over-represented</span>
+idx = np.random.<span class="c-fn">choice</span>(<span class="c-fn">len</span>(items), size=<span class="c-str">820_000</span>, replace=<span class="c-str">False</span>, p=weights/weights.<span class="c-fn">sum</span>())
+
+<span class="c-com"># 3. push the curated splits to the Hub</span>
+Item.<span class="c-fn">push_to_hub</span>(<span class="c-str">f"{user}/pricer-data"</span>, train, val, test)</code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "Your val accuracy looks great but production is bad — why?" — Suspect
+    <em>data leakage</em>: duplicates (or near-duplicates) bridging train and test. Dedup before splitting,
+    and keep the test set untouched until the very end.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">One question reaches back to Week 5 — interleaving is deliberate.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What does \"generalization\" mean for a model?","options":["Memorizing the training examples exactly","Predicting accurately on unseen data","Running on many GPUs at once","Producing the same output every time"],"answer":1,"why":"Generalization is performing well on new, unseen data by learning patterns — not memorizing the training set."},
+    {"q":"Why remove duplicate items before splitting the data?","options":["To make the dataset file smaller","To prevent leakage that inflates validation scores","To speed up the embedding step","To reduce the number of categories"],"answer":1,"why":"The same item in train and test (data leakage) makes validation look better than reality and hides overfitting."},
+    {"q":"Why apply weighted sampling to the Amazon data?","options":["To delete all the cheap items entirely","To rebalance a distribution skewed toward cheap items","To encrypt prices before uploading","To convert text into vectors"],"answer":1,"why":"The raw data skews cheap and toward some categories; weighting by price and down-weighting over-represented categories exposes the model to the full range."},
+    {"q":"What is the role of the held-out test set?","options":["To tune hyperparameters during training","A final, untouched check of real performance","To train the model faster in batches","To store duplicate items safely"],"answer":1,"why":"Test data is reserved and touched only at the end, so its score reflects true generalization rather than tuning."},
+    {"q":"(Week 5 recall) Why is fine-tuning cheaper than training a model from scratch?","options":["It skips using any training data","It reuses a pre-trained model (transfer learning)","It runs only on a CPU, never a GPU","It needs no evaluation step"],"answer":1,"why":"Fine-tuning starts from a pre-trained model and adapts it — leveraging existing knowledge instead of paying millions to train from zero."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>Hugging Face — <a href="https://huggingface.co/docs/datasets/index">Datasets docs</a> (loading,
+    filtering, <code>push_to_hub</code>). The dataset is the
+    <a href="https://huggingface.co/datasets/McAuley-Lab/Amazon-Reviews-2023">Amazon Reviews 2023</a> collection.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to reason about a weighting scheme for your own skewed data, or set up a
+    leak-free split? Ask. Terms live in the <a href="../reference/glossary.html">Week 6 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <span></span>
+    <a href="0027-day2-batch-preprocessing.html">Day 2 — Batch preprocessing →</a>
+  </nav>
+
+</div>
+</body>
+</html>

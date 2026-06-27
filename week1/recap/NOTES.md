@@ -38,7 +38,11 @@
   stores (Chroma), the retriever+LLM pipeline, evaluation (MRR/nDCG/LLM-as-judge), advanced RAG
   (semantic chunking, query rewriting/expansion, re-ranking; 0.73→0.91 MRR). Single arc, all days
   have notebooks. See [week5 learning record](../../week5/recap/learning-records/0005-week5-rag.md).
-- **Next:** after spacing, a mixed Week 1–5 exam; then the **Week 6** recap (fine-tuning).
+- **Week 6 recap: done** (lessons 0026–0030, `week6/recap/`) — "Price is Right" capstone begins:
+  data curation, 5-step process + batch preprocessing, traditional ML baselines (XGBoost), PyTorch
+  net vs zero-shot frontier, fine-tuning (SFT made it worse → behavior-not-knowledge; 289M from-scratch
+  redemption). See [week6 learning record](../../week6/recap/learning-records/0006-week6-data-and-finetuning.md).
+- **Next:** after spacing, a mixed Week 1–6 exam; then the **Week 7** recap (fine-tuning open-source / QLoRA).
 
 ## Quiz authoring rule (learned the hard way)
 - Inside `data-quiz='...'` JSON, every apostrophe MUST be the entity `&#39;` — a raw `'`

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 6 Glossary — LLM Engineering</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 6 <span class="dot">●</span> Reference</p>
+    <h1>Week 6 glossary</h1>
+    <p class="subtitle">Data, baselines &amp; fine-tuning: the capstone toolkit. Print &amp; pin.</p>
+  </header>
+
+  <p class="note">New terms from Week 6. See also the
+  <a href="../../../week1/recap/reference/glossary.html">Week 1</a>,
+  <a href="../../../week2/recap/reference/glossary.html">Week 2</a>,
+  <a href="../../../week3/recap/reference/glossary.html">Week 3</a>,
+  <a href="../../../week4/recap/reference/glossary.html">Week 4</a>, and
+  <a href="../../../week5/recap/reference/glossary.html">Week 5</a> glossaries.</p>
+
+  <table>
+    <thead><tr><th>Term</th><th>Meaning</th><th>Day</th></tr></thead>
+    <tbody>
+      <tr><td><b>Generalization</b></td><td>A model's ability to predict well on unseen data — the core goal of training.</td><td>1</td></tr>
+      <tr><td><b>Data curation</b></td><td>Cleaning, filtering, and balancing a dataset; often beats hyperparameter tuning for results.</td><td>1</td></tr>
+      <tr><td><b>Transfer learning</b></td><td>Adapting a pre-trained model to your task — far cheaper than training from scratch.</td><td>1</td></tr>
+      <tr><td><b>Data leakage</b></td><td>Train/test overlap (e.g. duplicates) that inflates validation scores and hides overfitting.</td><td>1</td></tr>
+      <tr><td><b>Weighted sampling</b></td><td>Sampling to rebalance a skewed distribution (e.g. weight by price, down-weight a category).</td><td>1</td></tr>
+      <tr><td><b>Train / val / test split</b></td><td>Learn / tune / final-check pools; test is held untouched until the end.</td><td>1</td></tr>
+      <tr><td><b>5-step process</b></td><td>Understand → Prepare → Select/Customize → Apply → Productionize.</td><td>2</td></tr>
+      <tr><td><b>MLOps</b></td><td>Productionizing &amp; maintaining ML: monitoring, evaluation, retraining.</td><td>2</td></tr>
+      <tr><td><b>Model drift</b></td><td>Performance decay as live data diverges from the training distribution.</td><td>2</td></tr>
+      <tr><td><b>Batch mode</b></td><td>Queue many requests asynchronously (JSONL) for ~50% lower cost vs synchronous.</td><td>2</td></tr>
+      <tr><td><b>JSONL</b></td><td>JSON Lines: one complete JSON object per line; used for batch &amp; fine-tune files.</td><td>2, 5</td></tr>
+      <tr><td><b>custom_id</b></td><td>Per-request ID in a batch so outputs can be matched back to inputs.</td><td>2</td></tr>
+      <tr><td><b>Baseline model</b></td><td>A simple model (even random) that fancier approaches must beat.</td><td>3</td></tr>
+      <tr><td><b>MAE</b></td><td>Mean Absolute Error: average size of the prediction error (here, in dollars).</td><td>3, 4</td></tr>
+      <tr><td><b>R²</b></td><td>Variance explained: 0 = no better than the average, 1 = perfect, negative = worse.</td><td>3, 4</td></tr>
+      <tr><td><b>Feature engineering</b></td><td>Crafting good input features; for traditional ML it matters more than the algorithm.</td><td>3</td></tr>
+      <tr><td><b>Bag-of-Words / CountVectorizer</b></td><td>Turns text into word-count vectors (top ~2,000 words, no stop-words).</td><td>3</td></tr>
+      <tr><td><b>Random Forest</b></td><td>Many independent decision trees, averaged.</td><td>3</td></tr>
+      <tr><td><b>XGBoost</b></td><td>Gradient-boosted trees built sequentially, each correcting the last's errors.</td><td>3</td></tr>
+      <tr><td><b>Training loop</b></td><td>Forward pass → loss → backward pass → optimizer step, over batches/epochs.</td><td>4</td></tr>
+      <tr><td><b>Epoch / batch size / learning rate</b></td><td>One pass over data / items per step / step size — core hyperparameters.</td><td>4</td></tr>
+      <tr><td><b>Loss function</b></td><td>Measures prediction error (e.g. MSELoss); its gradient drives learning.</td><td>4</td></tr>
+      <tr><td><b>Human baseline</b></td><td>Human performance on the task, used as a difficulty yardstick.</td><td>4</td></tr>
+      <tr><td><b>Zero-shot</b></td><td>Using a model on a task with no task-specific training, just a prompt.</td><td>4</td></tr>
+      <tr><td><b>Supervised fine-tuning (SFT)</b></td><td>Training a model on input→output pairs to adapt behavior (style/format), not knowledge.</td><td>5</td></tr>
+      <tr><td><b>LoRA</b></td><td>Low-Rank Adapters: small trainable matrices fine-tuned instead of the whole model.</td><td>5</td></tr>
+      <tr><td><b>Fine-tune vs RAG vs prompt</b></td><td>Behavior → fine-tune; knowledge → RAG; cheapest first → prompt/few-shot.</td><td>5</td></tr>
+    </tbody>
+  </table>
+
+  <p class="teacher">
+    <b>Your reference doc — it outlives the lessons.</b> Fuzzy on a row? Ask me to re-teach just that one.
+    Back to <a href="../lessons/0026-day1-data-curation.html">Week 6 Day 1</a>.
+  </p>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W6 Day 4 — Neural Nets vs Frontier Models</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 6 <span class="dot">●</span> Day 4 Recap</p>
+    <h1>Neural nets vs frontier models</h1>
+    <p class="subtitle">Your first PyTorch net — and a humbling: zero-shot frontier LLMs beat it.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> writing a PyTorch training loop and reading a
+    model-vs-model leaderboard are both interview staples. The surprise — frontier LLMs beating a
+    trained net with <em>no</em> task training — is exactly the kind of insight that shows real
+    understanding.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can write a basic PyTorch neural net and its training loop, and benchmark it against
+    frontier LLMs and a human baseline on the same task.</p>
+  </div>
+
+  <h2>The training loop, in four moves</h2>
+  <p>
+    Every neural network trains the same way: <b>forward pass → loss → backward pass → optimizer step</b>,
+    repeated over batches for several epochs. Today's net is 8 layers (~669k params) fed 5,000
+    Bag-of-Words features.
+  </p>
+
+  <h2>The leaderboard (MAE in $, lower is better)</h2>
+  <table>
+    <thead><tr><th>Predictor</th><th>MAE</th></tr></thead>
+    <tbody>
+      <tr><td>GPT-5.1 (zero-shot)</td><td>$44.74</td></tr>
+      <tr><td>Claude Opus 4.5 (zero-shot)</td><td>$47.10</td></tr>
+      <tr><td>Gemini 3 Pro (zero-shot)</td><td>$50.54</td></tr>
+      <tr><td>GPT-4o-mini (zero-shot)</td><td>$62.51</td></tr>
+      <tr><td>Trained neural net (8 layers)</td><td>$63.97</td></tr>
+      <tr><td>Human baseline</td><td>$87.62</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>The four training steps.</b> <code>outputs = model(x)</code> (forward) → <code>loss = loss_fn(outputs, y)</code>
+      → <code>loss.backward()</code> (gradients) → <code>optimizer.step()</code> (update weights).</li>
+    <li><b>Hyperparameters</b> set the run: batch size 64, learning rate 0.001, 2 epochs, MSE loss,
+      Adam optimizer, 5,000-feature input.</li>
+    <li><b>A human baseline matters.</b> Ed scored $87.62 on 100 items — proof the task is genuinely hard
+      and a yardstick for "good."</li>
+    <li><b>Frontier models are tested zero-shot.</b> No fine-tuning — just a prompt asking for the price,
+      parsing the number from the reply.</li>
+    <li><b>The humbling result.</b> Frontier LLMs (best: GPT-5.1, $44.74) beat the trained net ($63.97)
+      using only pre-training knowledge — they've effectively "seen" product pricing.</li>
+    <li><b>Two metrics, fairly applied.</b> MAE (dollars off) and R² (trend captured) via the same
+      ŷ-vs-y harness used since Day 3.</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-kw">import</span> torch.nn <span class="c-kw">as</span> nn
+
+<span class="c-kw">class</span> <span class="c-fn">Pricer</span>(nn.Module):
+    <span class="c-kw">def</span> <span class="c-fn">__init__</span>(self, n):
+        <span class="c-fn">super</span>().<span class="c-fn">__init__</span>()
+        self.net = nn.<span class="c-fn">Sequential</span>(nn.<span class="c-fn">Linear</span>(n, <span class="c-str">128</span>), nn.<span class="c-fn">ReLU</span>(),
+                                 nn.<span class="c-fn">Linear</span>(<span class="c-str">128</span>, <span class="c-str">64</span>), nn.<span class="c-fn">ReLU</span>(), nn.<span class="c-fn">Linear</span>(<span class="c-str">64</span>, <span class="c-str">1</span>))
+    <span class="c-kw">def</span> <span class="c-fn">forward</span>(self, x): <span class="c-kw">return</span> self.net(x)
+
+<span class="c-com"># the training loop = the four moves</span>
+<span class="c-kw">for</span> epoch <span class="c-kw">in</span> <span class="c-fn">range</span>(EPOCHS):
+    <span class="c-kw">for</span> xb, yb <span class="c-kw">in</span> train_loader:
+        out = <span class="c-fn">model</span>(xb)                 <span class="c-com"># forward</span>
+        loss = <span class="c-fn">loss_fn</span>(out, yb)         <span class="c-com"># loss</span>
+        optimizer.<span class="c-fn">zero_grad</span>(); loss.<span class="c-fn">backward</span>()   <span class="c-com"># gradients</span>
+        optimizer.<span class="c-fn">step</span>()              <span class="c-com"># update weights</span></code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "How can an untrained LLM beat a model trained on 800k examples?" —
+    The frontier model isn't really untrained; pre-training already absorbed enormous knowledge about
+    products and prices. Your small net starts from zero and sees only Bag-of-Words counts.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Interleaves a Week 1 idea with today's training loop.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What are the four steps of a neural network training loop?","options":["Load, clean, split, upload the data","Forward pass, loss, backward pass, optimizer step","Embed, retrieve, rerank, generate text","Tokenize, encode, decode, detokenize"],"answer":1,"why":"Forward pass computes outputs, loss measures error, backward pass computes gradients, the optimizer step updates the weights."},
+    {"q":"Why did frontier LLMs beat the trained neural net zero-shot?","options":["They were secretly fine-tuned on the data","Pre-training already gave them product/price knowledge","They used a larger Bag-of-Words vector","The net was trained for too many epochs"],"answer":1,"why":"Frontier models leverage vast pre-training knowledge about products and prices; the small net starts from scratch with only word counts."},
+    {"q":"What is the human baseline for in this comparison?","options":["To label the training data by hand","A yardstick showing how hard the task is","To replace the test set entirely","To set the learning rate value"],"answer":1,"why":"Ed&#39;s $87.62 human error establishes that the task is genuinely hard and gives a reference point for judging the models."},
+    {"q":"What does the loss function do in training?","options":["It updates the weights directly","It measures how wrong the predictions are","It selects which features to use","It picks the learning rate automatically"],"answer":1,"why":"The loss quantifies prediction error; gradients of the loss then tell the optimizer how to adjust the weights."},
+    {"q":"(Week 1 recall) The frontier models predict a price by…","options":["running a scikit-learn regressor internally","generating the answer as text you then parse","looking the product up in a database","averaging the training set prices"],"answer":1,"why":"They&#39;re prompted to output a price and you parse the number from the generated text — the same chat-completion pattern from Week 1."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>PyTorch — <a href="https://pytorch.org/tutorials/beginner/basics/optimization_tutorial.html">the
+    training-loop tutorial</a> (forward, loss, backward, step) and
+    <a href="https://pytorch.org/tutorials/beginner/basics/buildmodel_tutorial.html">building a model</a>.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to walk through what <code>loss.backward()</code> actually computes, or
+    why Adam beats plain SGD? Ask. See the <a href="../reference/glossary.html">Week 6 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0028-day3-traditional-ml-baselines.html">← Day 3</a>
+    <a href="0030-day5-fine-tuning.html">Day 5 — Fine-tuning →</a>
+  </nav>
+
+</div>
+</body>
+</html>
