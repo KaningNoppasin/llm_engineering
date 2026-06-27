@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 7 Recap — LLM Engineering</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 7 <span class="dot">●</span> Recap Course</p>
+    <h1>Week 7 — fine-tuning open-source (QLoRA)</h1>
+    <p class="subtitle">Five daily recaps with active-recall quizzes. The capstone climax: beat the frontier.</p>
+  </header>
+
+  <div class="mission">
+    <strong>The week in one line:</strong> QLoRA &amp; adapters (Day 1) → dataset prep + base-model baseline
+    (Day 2) → hyperparameters &amp; the SFT Trainer (Day 3) → monitoring &amp; catching overfitting (Day 4)
+    → results + cross-entropy, where a fine-tuned 3B model beats GPT-5.1 (Day 5).
+  </div>
+
+  <h2>The five lessons</h2>
+  <ul class="concepts">
+    <li><a href="lessons/0031-day1-qlora.html"><b>Day 1 — QLoRA &amp; low-rank adapters.</b></a> Freeze base + train adapters, r/alpha/target_modules, 4-bit.</li>
+    <li><a href="lessons/0032-day2-dataset-prep.html"><b>Day 2 — Dataset prep &amp; the base model.</b></a> Base vs chat, prompt template, token cutoff, rounding, baseline.</li>
+    <li><a href="lessons/0033-day3-training-config.html"><b>Day 3 — Hyperparameters &amp; the SFT Trainer.</b></a> LR/cosine/epochs, TRL SFTTrainer, Weights &amp; Biases.</li>
+    <li><a href="lessons/0034-day4-monitoring-and-overfitting.html"><b>Day 4 — Monitoring &amp; overfitting.</b></a> Train vs validation loss, 800K on an A100, best checkpoint.</li>
+    <li><a href="lessons/0035-day5-results-and-cross-entropy.html"><b>Day 5 — Results &amp; cross-entropy.</b></a> base+adapters inference, top-k price, cross-entropy, the win.</li>
+  </ul>
+
+  <h2>Reference</h2>
+  <ul class="concepts">
+    <li><a href="reference/glossary.html"><b>Week 7 glossary</b></a> — every new term, one printable table.</li>
+    <li><a href="../../week6/recap/index.html"><b>← Week 6</b></a> &nbsp;·&nbsp; <a href="../../week5/recap/index.html"><b>5</b></a> &nbsp;·&nbsp; <a href="../../week4/recap/index.html"><b>4</b></a> &nbsp;·&nbsp; <a href="../../week3/recap/index.html"><b>3</b></a> &nbsp;·&nbsp; <a href="../../week2/recap/index.html"><b>2</b></a> &nbsp;·&nbsp; <a href="../../week1/recap/index.html"><b>1</b></a></li>
+  </ul>
+
+  <div class="gotcha">
+    <b>How to use this for storage strength:</b> one lesson + quiz per sitting; re-take the previous day's
+    quiz cold first. This week continues Week 6's capstone — same dataset, now a fine-tuned open model that
+    beats the frontier.
+  </div>
+
+  <p class="teacher">
+    <b>I'm your teacher.</b> Ask for a mixed Week 1–7 exam, a deeper dive, or to start the Week 8 recap
+    (productionizing the capstone — the finale).
+  </p>
+
+</div>
+</body>
+</html>

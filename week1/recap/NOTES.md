@@ -42,7 +42,11 @@
   data curation, 5-step process + batch preprocessing, traditional ML baselines (XGBoost), PyTorch
   net vs zero-shot frontier, fine-tuning (SFT made it worse → behavior-not-knowledge; 289M from-scratch
   redemption). See [week6 learning record](../../week6/recap/learning-records/0006-week6-data-and-finetuning.md).
-- **Next:** after spacing, a mixed Week 1–6 exam; then the **Week 7** recap (fine-tuning open-source / QLoRA).
+- **Week 7 recap: done** (lessons 0031–0035, `week7/recap/`) — QLoRA fine-tuning open-source: LoRA/QLoRA
+  adapters, dataset prep (base model), hyperparameters + TRL SFTTrainer + W&B, monitoring/overfitting,
+  cross-entropy; fine-tuned Llama 3.2 3B ($39.85) beats GPT-5.1 ($44.74). Days 3&4 share a notebook.
+  See [week7 learning record](../../week7/recap/learning-records/0007-week7-qlora-finetuning.md).
+- **Next:** after spacing, a mixed Week 1–7 exam; then the **Week 8** recap (productionizing — the finale).
 
 ## Quiz authoring rule (learned the hard way)
 - Inside `data-quiz='...'` JSON, every apostrophe MUST be the entity `&#39;` — a raw `'`

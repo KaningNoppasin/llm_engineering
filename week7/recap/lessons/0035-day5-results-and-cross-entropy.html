@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W7 Day 5 — Results &amp; Cross-Entropy</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 7 <span class="dot">●</span> Day 5 Recap</p>
+    <h1>Results &amp; cross-entropy</h1>
+    <p class="subtitle">The payoff: a fine-tuned 3B open model beats the frontier — and why.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> this is the capstone result you can put on a
+    résumé: a 3B model you fine-tuned beating GPT-5.1 on a real task. Understanding <em>why</em> — and
+    cross-entropy, how LLMs actually learn — is exactly what an interviewer wants to hear.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can run inference on a QLoRA model (base + adapters), turn its token probabilities into a
+    sharp price, and explain cross-entropy loss.</p>
+  </div>
+
+  <h2>The headline result (MAE in $, lower is better)</h2>
+  <table>
+    <thead><tr><th>Predictor</th><th>MAE</th></tr></thead>
+    <tbody>
+      <tr><td><b>Fine-tuned Llama 3.2 3B (full)</b></td><td><b>$39.85</b></td></tr>
+      <tr><td>GPT-5.1 (zero-shot)</td><td>$44.74</td></tr>
+      <tr><td>Claude Opus 4.5</td><td>$47.10</td></tr>
+      <tr><td>Gemini 3 Pro</td><td>$50.54</td></tr>
+      <tr><td>GPT-4.1-nano</td><td>$62.51</td></tr>
+      <tr><td>Fine-tuned Llama (light, 1hr)</td><td>$65.40</td></tr>
+      <tr><td>Human baseline</td><td>$87.62</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>Inference = base + adapters.</b> Load the 4-bit base, then overlay the trained LoRA adapters
+      from the Hub with <code>PeftModel.from_pretrained(...)</code> (and a <code>revision</code> for the
+      best checkpoint).</li>
+    <li><b>Sharpen the prediction with top-k.</b> Don't take the single most-likely token — read the
+      <em>top-k</em> token probabilities and compute a probability-<b>weighted average</b> for a smoother,
+      more accurate price.</li>
+    <li><b>The forward pass outputs a distribution.</b> The LM head produces 128,256 logits;
+      <b>softmax</b> turns them into probabilities that sum to 1.</li>
+    <li><b>Cross-entropy loss = −log(p<sub>true</sub>).</b> The loss is the negative log of the probability
+      the model gave the correct next token. Predict it with certainty → loss 0; low probability → high loss.</li>
+    <li><b>Backprop trains only the adapters.</b> Gradients flow back via the chain rule, but the frozen
+      4-bit base gets none — only the LoRA matrices update.</li>
+    <li><b>Small + specialized beats big + general.</b> The 3B model (runs on a phone) wins because it has
+      <em>task-specific</em> expertise from your data; frontier models are generalists that never saw it.</li>
+    <li><b>This is the whole course in one result.</b> Curate data (W6) → quantize + LoRA (W7) → train →
+      evaluate → beat the baseline. That's the job.</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-kw">from</span> peft <span class="c-kw">import</span> PeftModel
+
+<span class="c-com"># base (4-bit) + trained adapters from the Hub</span>
+base  = AutoModelForCausalLM.<span class="c-fn">from_pretrained</span>(BASE, quantization_config=bnb, device_map=<span class="c-str">"auto"</span>)
+model = PeftModel.<span class="c-fn">from_pretrained</span>(base, ADAPTERS, revision=best_commit)
+
+<span class="c-com"># weighted-average over the top-k next-token probabilities -> sharper price</span>
+logits = <span class="c-fn">model</span>(**inputs).logits[<span class="c-str">0</span>, -<span class="c-str">1</span>]          <span class="c-com"># distribution over next token</span>
+probs  = logits.<span class="c-fn">softmax</span>(dim=-<span class="c-str">1</span>)
+top = probs.<span class="c-fn">topk</span>(<span class="c-str">5</span>)
+price = <span class="c-fn">sum</span>(p * <span class="c-fn">int</span>(tokenizer.<span class="c-fn">decode</span>(t)) <span class="c-kw">for</span> p, t <span class="c-kw">in</span> <span class="c-fn">zip</span>(top.values, top.indices))</code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "How can a 3B model beat GPT-5.1?" — Specialization. Frontier models
+    spent ~$100M on broad ability; your fine-tune spent capacity entirely on <em>this</em> domain with
+    800K examples. For a narrow, data-rich task, focused beats vast.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Final Week 7 quiz — it interleaves Days 1, 4 and a Week 6 idea.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What is cross-entropy loss for a language model?","options":["The dollar error of the prediction","The negative log of the true token&#39;s probability","The number of tokens generated","The difference between two embeddings"],"answer":1,"why":"Cross-entropy is −log(p) of the probability the model assigned to the correct next token; perfect confidence gives loss 0."},
+    {"q":"How is the price sharpened from the model&#39;s output?","options":["By taking only the single most likely token","A probability-weighted average over top-k tokens","By rounding the logits to whole numbers","By averaging every token in the vocabulary"],"answer":1,"why":"Reading the top-k token probabilities and weighting their values gives a smoother, more accurate estimate than argmax alone."},
+    {"q":"At inference, how is the fine-tuned model assembled?","options":["The adapters replace the whole base model","The 4-bit base plus the trained LoRA adapters","Only the adapters, with no base model","A merged full-precision 3B checkpoint"],"answer":1,"why":"You load the quantized base and overlay the trained LoRA adapters (PeftModel.from_pretrained), optionally at the best revision."},
+    {"q":"Why did the fine-tuned 3B model beat frontier models here?","options":["It has more parameters than they do","Task-specific expertise from the training data","It was given the test answers in advance","It used a far larger context window"],"answer":1,"why":"For a narrow, data-rich task, a specialized fine-tune outperforms generalist frontier models that never trained on this domain."},
+    {"q":"(Week 6 recall) Last week fine-tuning a frontier model got worse; why did this work?","options":["This used a bigger frontier model","Here a small base model gained new domain skill","The task was easier this week","Cross-entropy was not used last week"],"answer":1,"why":"Week 6 fine-tuned an already-capable frontier model (no new signal); here a small base model genuinely learned the domain from scratch via QLoRA."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>Hugging Face — <a href="https://huggingface.co/docs/transformers/en/perplexity">cross-entropy &amp;
+    perplexity</a>; for intuition, 3Blue1Brown's <a href="https://www.youtube.com/watch?v=Ilg3gGewQ5U">backpropagation</a>.
+    PEFT — <a href="https://huggingface.co/docs/peft/index">loading adapters</a>.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to work through a cross-entropy calculation by hand, or productionize this
+    fine-tuned model? Ask. Everything's in the <a href="../reference/glossary.html">Week 7 glossary</a>,
+    and you can revisit the <a href="0031-day1-qlora.html">Week 7 lessons index</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0034-day4-monitoring-and-overfitting.html">← Day 4</a>
+    <a href="../reference/glossary.html">Week 7 glossary →</a>
+  </nav>
+
+</div>
+</body>
+</html>

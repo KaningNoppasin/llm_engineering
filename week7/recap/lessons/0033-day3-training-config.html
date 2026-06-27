@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W7 Day 3 — Hyperparameters &amp; the SFT Trainer</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 7 <span class="dot">●</span> Day 3 Recap</p>
+    <h1>Hyperparameters &amp; the SFT Trainer</h1>
+    <p class="subtitle">The dials that govern training — and the tool that runs the loop for you.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> hyperparameters are where fine-tuning goes right or
+    wrong, and "I tuned the learning rate / used a cosine schedule / tracked it in W&amp;B" is the
+    vocabulary of someone who has actually trained models — not just called an API.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can set the core training hyperparameters, launch a QLoRA run with TRL's
+    <code>SFTTrainer</code>, and track it live in Weights &amp; Biases.</p>
+  </div>
+
+  <h2>The hyperparameters that matter</h2>
+  <ul class="concepts">
+    <li><b>Epochs</b> — full passes over the data (1–3). Each epoch reshuffles batches for fresh gradient
+      signal.</li>
+    <li><b>Batch size</b> — items per gradient step; bump it up to fill the GPU (powers of 2: 32, 256).</li>
+    <li><b>Learning rate</b> — the step size (~<code>1e-4</code>). Too high overshoots/diverges; too low
+      crawls. Tune in powers of 10.</li>
+    <li><b>LR scheduler (cosine + warmup)</b> — start low, ramp up, then decay: explore broadly early,
+      refine precisely late.</li>
+    <li><b>Gradient accumulation</b> — sum gradients over N steps before updating, simulating a bigger
+      batch without running out of memory.</li>
+    <li><b>Optimizer (<code>paged_adamw</code>)</b> — Adam with momentum, paged to survive memory spikes;
+      converges faster than plain SGD.</li>
+    <li><b>SFTTrainer (TRL)</b> bundles model + dataset + LoRA config + <code>SFTConfig</code> and runs
+      the forward/backward/optimize loop for you.</li>
+    <li><b>Weights &amp; Biases (wandb)</b> logs loss, learning rate, and metrics per step so you watch
+      training live and compare runs.</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-kw">from</span> trl <span class="c-kw">import</span> SFTTrainer, SFTConfig
+<span class="c-kw">import</span> wandb; wandb.<span class="c-fn">init</span>(project=<span class="c-str">"pricer"</span>, name=run_name)
+
+args = <span class="c-fn">SFTConfig</span>(
+    num_train_epochs=<span class="c-str">1</span>,
+    per_device_train_batch_size=<span class="c-str">32</span>,
+    gradient_accumulation_steps=<span class="c-str">1</span>,
+    learning_rate=<span class="c-str">1e-4</span>,
+    lr_scheduler_type=<span class="c-str">"cosine"</span>,
+    warmup_ratio=<span class="c-str">0.03</span>,
+    optim=<span class="c-str">"paged_adamw_32bit"</span>,
+    max_seq_length=<span class="c-str">128</span>,
+    logging_steps=<span class="c-str">5</span>, save_steps=<span class="c-str">100</span>,
+    report_to=[<span class="c-str">"wandb"</span>],          <span class="c-com"># live tracking</span>
+)
+
+trainer = <span class="c-fn">SFTTrainer</span>(model=base, train_dataset=train, eval_dataset=val,
+                     peft_config=lora, args=args)
+trainer.<span class="c-fn">train</span>()                     <span class="c-com"># runs the whole loop</span></code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "Why a cosine schedule with warmup?" — Warmup avoids a big early step
+    that destabilizes fresh weights; the cosine decay then lets the model take big exploratory steps early
+    and fine, careful steps near the end. A constant LR does neither well.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Interleaves a Week 6 idea with today's training config.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What does the learning rate control?","options":["How many epochs the run lasts","The step size of each weight update","Which layers receive LoRA adapters","How many GPUs the run uses"],"answer":1,"why":"The learning rate is the size of each parameter update; too high overshoots and diverges, too low gets stuck and trains slowly."},
+    {"q":"What does a cosine LR scheduler with warmup do?","options":["Keeps the learning rate fixed throughout","Ramps up then decays the learning rate over training","Doubles the batch size each epoch","Stops training when loss stops falling"],"answer":1,"why":"It warms up from low, peaks, then decays — broad exploration early, fine refinement late, avoiding an unstable first step."},
+    {"q":"What does gradient accumulation let you do?","options":["Skip the backward pass entirely","Simulate a larger batch without more memory","Train without a learning rate","Quantize the gradients to 4-bit"],"answer":1,"why":"It sums gradients over several steps before updating, giving the effect of a bigger batch without the memory cost."},
+    {"q":"What does TRL&#39;s <code>SFTTrainer</code> handle for you?","options":["Only downloading the dataset","The forward/backward/optimize training loop","Just logging to Weights &amp; Biases","Only the 4-bit quantization step"],"answer":1,"why":"SFTTrainer ties model + dataset + LoRA config + SFTConfig together and runs the full supervised fine-tuning loop."},
+    {"q":"(Week 6 recall) The 4 steps the trainer runs each batch are…","options":["load, clean, split, upload","forward, loss, backward, optimizer step","embed, retrieve, rerank, generate","tokenize, encode, decode, print"],"answer":1,"why":"It&#39;s the same training loop from Week 6 Day 4 — forward pass, compute loss, backward pass for gradients, optimizer step — just driven by SFTTrainer."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>Hugging Face — <a href="https://huggingface.co/docs/trl/sft_trainer">TRL SFTTrainer docs</a> and
+    <a href="https://docs.wandb.ai/guides/integrations/huggingface/">Weights &amp; Biases + Transformers</a>.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to reason about batch size vs learning rate, or what
+    <code>paged_adamw</code> pages? Ask. See the <a href="../reference/glossary.html">Week 7 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0032-day2-dataset-prep.html">← Day 2</a>
+    <a href="0034-day4-monitoring-and-overfitting.html">Day 4 — Monitoring &amp; overfitting →</a>
+  </nav>
+
+</div>
+</body>
+</html>

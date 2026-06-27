@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W7 Day 1 — QLoRA &amp; Low-Rank Adapters</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 7 <span class="dot">●</span> Day 1 Recap</p>
+    <h1>QLoRA &amp; low-rank adapters</h1>
+    <p class="subtitle">Fine-tune a 3B model on a free GPU by training 0.6% of it.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> QLoRA is <em>the</em> technique that makes
+    fine-tuning affordable — it's how small teams adapt open models without a data-center. "I fine-tuned
+    Llama with QLoRA on one GPU" is a concrete, in-demand line on a CV.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can configure QLoRA — 4-bit base + LoRA adapters — and explain what <code>r</code>,
+    <code>lora_alpha</code>, and <code>target_modules</code> each do.</p>
+  </div>
+
+  <h2>The two ideas: LoRA + Q</h2>
+  <p>
+    <b>LoRA (Low-Rank Adaptation)</b>: freeze the entire base model and train tiny <em>adapter</em>
+    matrices that get added into a few layers. <b>QLoRA</b> adds the "Q": <em>quantize</em> the frozen
+    base to 4-bit (13GB → ~2.2GB) while the adapters stay full precision. Result: you train ~0.6% of the
+    parameters and the whole thing fits on a free Colab T4.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>Freeze the base, train adapters.</b> The 3B base weights never update — only the small LoRA
+      A·B matrices do, so gradients/optimizer state are tiny.</li>
+    <li><b><code>r</code> (rank)</b> sets adapter capacity (common: 8, 16, 32, up to 256). Higher r =
+      more trainable parameters and fit, but slower.</li>
+    <li><b><code>lora_alpha</code></b> scales the adapter's contribution; rule of thumb <b>alpha = 2·r</b>.</li>
+    <li><b><code>target_modules</code></b> picks which layers get adapters — start with the attention
+      projections <code>q_proj, k_proj, v_proj, o_proj</code>; add MLP layers for more capacity.</li>
+    <li><b><code>lora_dropout</code></b> regularizes the adapters to fight overfitting.</li>
+    <li><b>4-bit barely hurts.</b> <code>nf4</code> spends its 16 levels where weights actually cluster
+      (normal distribution), so the model stays ~95%+ as capable — Week 3's quantization, now for training.</li>
+    <li><b>The savings are dramatic.</b> r=32 → ~18M trainable params (0.6% of 3B, ~73MB on disk) vs the
+      full 3B; a heavy r=256 + MLP variant is still only ~13% of the model.</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-kw">from</span> transformers <span class="c-kw">import</span> AutoModelForCausalLM, BitsAndBytesConfig
+<span class="c-kw">from</span> peft <span class="c-kw">import</span> LoraConfig, get_peft_model
+
+<span class="c-com"># quantize the BASE model to 4-bit (the "Q" in QLoRA)</span>
+bnb = <span class="c-fn">BitsAndBytesConfig</span>(load_in_4bit=<span class="c-str">True</span>, bnb_4bit_quant_type=<span class="c-str">"nf4"</span>,
+                         bnb_4bit_compute_dtype=torch.bfloat16, bnb_4bit_use_double_quant=<span class="c-str">True</span>)
+base = AutoModelForCausalLM.<span class="c-fn">from_pretrained</span>(<span class="c-str">"meta-llama/Llama-3.2-3B"</span>,
+                                            quantization_config=bnb, device_map=<span class="c-str">"auto"</span>)
+
+<span class="c-com"># attach trainable LoRA adapters (the rest stays frozen)</span>
+lora = <span class="c-fn">LoraConfig</span>(r=<span class="c-str">32</span>, lora_alpha=<span class="c-str">64</span>, lora_dropout=<span class="c-str">0.05</span>,
+                  target_modules=[<span class="c-str">"q_proj"</span>, <span class="c-str">"k_proj"</span>, <span class="c-str">"v_proj"</span>, <span class="c-str">"o_proj"</span>])
+model = <span class="c-fn">get_peft_model</span>(base, lora)   <span class="c-com"># now only ~0.6% of params are trainable</span></code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "Why not just fine-tune the whole model?" — Memory. Full fine-tuning a
+    3B model needs the weights <em>plus</em> gradients and optimizer state (often 4× the model). QLoRA
+    keeps the base frozen and 4-bit, so you only pay for the tiny adapters' gradients.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">One question reaches back to Week 3 — interleaving is deliberate.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What does LoRA train instead of the full model?","options":["A second copy of the whole model","Small low-rank adapter matrices added to layers","Only the embedding and LM-head layers","A compressed 4-bit version of the weights"],"answer":1,"why":"LoRA freezes the base model and trains small low-rank adapter matrices added into target layers — a tiny fraction of the parameters."},
+    {"q":"What does the \"Q\" in QLoRA add over plain LoRA?","options":["It queries a database during training","It quantizes the frozen base model to 4-bit","It doubles the number of adapters","It speeds up the query projection only"],"answer":1,"why":"QLoRA quantizes the frozen base to 4-bit (so it fits in much less memory) while training the LoRA adapters on top."},
+    {"q":"What is the usual rule of thumb for <code>lora_alpha</code>?","options":["Equal to the batch size","Roughly twice the rank r","The same as the learning rate","Half the number of layers"],"answer":1,"why":"A common convention is lora_alpha = 2 × r (e.g. r=32 → alpha=64); alpha scales the adapter&#39;s contribution."},
+    {"q":"Which layers do you target with LoRA first?","options":["The token embedding layer only","The attention projections q/k/v/o","The final LM head exclusively","Every layer in the network at once"],"answer":1,"why":"Start with the attention projections (q_proj, k_proj, v_proj, o_proj); add MLP layers only if you need more capacity and have the data."},
+    {"q":"(Week 3 recall) Why does 4-bit quantization barely hurt quality?","options":["The model ignores the quantized layers","nf4 places its 16 levels where weights cluster","It only quantizes unused parameters","Quantization adds new parameters to compensate"],"answer":1,"why":"As in Week 3, nf4 maps its 16 values to where normally-distributed weights actually live, preserving most of the model&#39;s capability."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>Dettmers et al., <a href="https://arxiv.org/abs/2305.14314"><i>QLoRA: Efficient Finetuning of
+    Quantized LLMs</i></a> (2023), and Hugging Face's <a href="https://huggingface.co/docs/peft/index">PEFT
+    docs</a> (LoraConfig, get_peft_model).</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to see how the A·B matrices actually reconstruct a weight update, or pick
+    an r for your data? Ask. Terms live in the <a href="../reference/glossary.html">Week 7 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <span></span>
+    <a href="0032-day2-dataset-prep.html">Day 2 — Dataset prep →</a>
+  </nav>
+
+</div>
+</body>
+</html>

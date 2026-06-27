@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W7 Day 2 — Dataset Prep &amp; the Base Model</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 7 <span class="dot">●</span> Day 2 Recap</p>
+    <h1>Dataset prep &amp; the base model</h1>
+    <p class="subtitle">Shape the data for the model — and measure the untrained baseline first.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> fine-tuning lives or dies on data shape. The small
+    decisions here — base vs chat, prompt template, token cutoff, rounding the target — are exactly the
+    "why did your fine-tune work?" details an interviewer probes.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can format a fine-tuning dataset for a <b>base</b> model, optimize its token length, and test
+    the untrained model to get a baseline to beat.</p>
+  </div>
+
+  <h2>Base, not chat</h2>
+  <p>
+    You fine-tune the <b>base</b> Llama 3.2, not the chat variant. A base model just predicts the next
+    token after any text — perfect for a single-instruction task. A chat model expects
+    system/user/assistant structure you don't need here, and does worse.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>The prompt template.</b> <code>"How much does this cost to the nearest dollar? {desc} Price is $"</code>
+      — the model completes with the number. The answer is appended for training.</li>
+    <li><b>Llama tokenizes 0–999 as single tokens.</b> So predicting a price becomes (almost) a
+      <em>one-token</em> task — a big reason Llama suits this problem.</li>
+    <li><b>Round prices in training data.</b> Token prediction weights every token equally; keeping cents
+      makes the model waste capacity on them. Round to whole dollars for training, keep true prices in
+      <em>test</em> for a fair benchmark.</li>
+    <li><b>Optimize token length.</b> Max item is ~245 tokens; cut descriptions to ~110 (truncating only
+      ~5.7% of items). GPU memory scales with sequence length, so shorter = faster/cheaper.</li>
+    <li><b>Pick a power-of-2 max length.</b> Prompt + 110 + "Price is $" ≈ 126 → round to <b>128</b> for
+      clean memory alignment.</li>
+    <li><b>Test the base model first.</b> Untrained Llama scores ~<b>$110.72</b> MAE — <em>worse</em> than
+      Week 6's constant-guess baseline ($106). That's your "before" number; fine-tuning has to beat it.</li>
+    <li><b>Standard splits.</b> prompt/completion columns; 20k/1k/1k (light) or 10× for the full run.</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-com"># build the training prompt; round the price for the target</span>
+<span class="c-kw">def</span> <span class="c-fn">make_prompt</span>(item, tokenizer, max_tokens=<span class="c-str">110</span>):
+    desc = tokenizer.<span class="c-fn">decode</span>(tokenizer.<span class="c-fn">encode</span>(item.summary)[:max_tokens])
+    prompt     = <span class="c-str">f"How much does this cost to the nearest dollar?\n{desc}\nPrice is $"</span>
+    completion = <span class="c-fn">str</span>(<span class="c-fn">round</span>(item.price))     <span class="c-com"># whole dollars for training</span>
+    <span class="c-kw">return</span> prompt, completion
+
+<span class="c-com"># baseline: what does the UNTRAINED base model predict?</span>
+inputs = tokenizer(prompt, return_tensors=<span class="c-str">"pt"</span>).<span class="c-fn">to</span>(<span class="c-str">"cuda"</span>)
+<span class="c-kw">with</span> torch.<span class="c-fn">no_grad</span>():
+    out = base.<span class="c-fn">generate</span>(**inputs, max_new_tokens=<span class="c-str">5</span>)
+<span class="c-fn">print</span>(tokenizer.<span class="c-fn">decode</span>(out[<span class="c-str">0</span>, inputs.input_ids.shape[<span class="c-str">1</span>]:]))</code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "Why round the prices?" — The model predicts tokens, not numbers.
+    "$59.99" is several tokens of which only the magnitude matters; rounding to "$60" focuses the
+    learning signal on getting the dollar amount right instead of memorizing cents.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Interleaves a Week 3 idea with today's data prep.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"Why fine-tune the base model rather than the chat model here?","options":["Chat models cannot be fine-tuned at all","Base predicts next tokens; ideal for a single instruction","Base models are always more accurate","Chat models cost more to download"],"answer":1,"why":"The task is a single instruction with a short completion; a base next-token predictor fits better than a chat model expecting dialogue structure."},
+    {"q":"Why round prices to whole dollars in the training data?","options":["To make the dataset file smaller","To focus the learning signal on magnitude, not cents","Because Llama cannot represent decimals","To match the chat model output format"],"answer":1,"why":"Token prediction weights every token equally; rounding stops the model wasting capacity on cents and focuses it on the dollar amount."},
+    {"q":"Why truncate product descriptions to ~110 tokens?","options":["Longer text confuses the tokenizer","GPU memory scales with sequence length, so shorter is faster","The model ignores anything past 110 tokens","To remove the price from the description"],"answer":1,"why":"Memory and time scale with max sequence length; cutting to 110 truncates only ~5.7% of items while keeping the important early content."},
+    {"q":"What was the untrained base model&#39;s error, and why note it?","options":["About $40; it was already excellent","About $110; a baseline fine-tuning must beat","Exactly $0; it memorized the prices","About $200; worse than random guessing"],"answer":1,"why":"Untrained Llama scored ~$110 MAE — even worse than the constant-guess baseline — giving a clear \"before\" number to improve on."},
+    {"q":"(Week 3 recall) Why does predicting a 0–999 price suit Llama specifically?","options":["Llama has a tiny vocabulary of only numbers","Llama encodes each 0–999 number as a single token","Llama cannot output any text besides numbers","Llama rounds every output automatically"],"answer":1,"why":"Llama&#39;s tokenizer maps each number 0–999 to one token, so price prediction becomes almost a one-token classification — a tokenizer detail from Week 3."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>Hugging Face — <a href="https://huggingface.co/docs/transformers/llm_tutorial">how base LLMs generate</a>,
+    and the <a href="https://huggingface.co/docs/trl/sft_trainer#dataset-format-support">TRL dataset format guide</a>
+    (prompt/completion for SFT).</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to inspect the token-length histogram of your own data, or design a
+    prompt template for a different task? Ask. See the <a href="../reference/glossary.html">Week 7 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0031-day1-qlora.html">← Day 1</a>
+    <a href="0033-day3-training-config.html">Day 3 — Training config →</a>
+  </nav>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 7 Glossary — LLM Engineering</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 7 <span class="dot">●</span> Reference</p>
+    <h1>Week 7 glossary</h1>
+    <p class="subtitle">QLoRA fine-tuning: adapters, hyperparameters, training, cross-entropy. Print &amp; pin.</p>
+  </header>
+
+  <p class="note">New terms from Week 7. See also the
+  <a href="../../../week1/recap/reference/glossary.html">Week 1</a>,
+  <a href="../../../week2/recap/reference/glossary.html">2</a>,
+  <a href="../../../week3/recap/reference/glossary.html">3</a>,
+  <a href="../../../week4/recap/reference/glossary.html">4</a>,
+  <a href="../../../week5/recap/reference/glossary.html">5</a>, and
+  <a href="../../../week6/recap/reference/glossary.html">6</a> glossaries.</p>
+
+  <table>
+    <thead><tr><th>Term</th><th>Meaning</th><th>Day</th></tr></thead>
+    <tbody>
+      <tr><td><b>LoRA</b></td><td>Low-Rank Adaptation: freeze the base model, train small adapter matrices added into layers.</td><td>1</td></tr>
+      <tr><td><b>QLoRA</b></td><td>LoRA with a 4-bit quantized base model — fits huge models on one GPU.</td><td>1</td></tr>
+      <tr><td><b>Adapter (A·B matrices)</b></td><td>The small trainable low-rank matrices LoRA adds; multiplied and scaled into a target layer.</td><td>1</td></tr>
+      <tr><td><b>r (rank)</b></td><td>Adapter capacity (8/16/32…256); higher = more trainable params and fit, slower.</td><td>1</td></tr>
+      <tr><td><b>lora_alpha</b></td><td>Scaling applied to the adapter; convention alpha = 2·r.</td><td>1</td></tr>
+      <tr><td><b>target_modules</b></td><td>Layers that get adapters — usually attention q/k/v/o, optionally MLP.</td><td>1</td></tr>
+      <tr><td><b>lora_dropout</b></td><td>Dropout on the adapters to reduce overfitting.</td><td>1</td></tr>
+      <tr><td><b>PEFT</b></td><td>Parameter-Efficient Fine-Tuning — the HF library/family (LoRA etc.).</td><td>1, 5</td></tr>
+      <tr><td><b>Base vs chat model</b></td><td>Base predicts next tokens for any text; chat expects dialogue structure. Fine-tune the base here.</td><td>2</td></tr>
+      <tr><td><b>Prompt/completion format</b></td><td>Training pairs: a prompt ending in "Price is $" and the completion (the price).</td><td>2</td></tr>
+      <tr><td><b>Token-length cutoff</b></td><td>Truncating inputs (e.g. 110 tokens) to save GPU memory/time; pad to a power of 2 (128).</td><td>2</td></tr>
+      <tr><td><b>Epoch</b></td><td>One full pass over the training data; batches reshuffled each epoch.</td><td>3</td></tr>
+      <tr><td><b>Learning rate</b></td><td>Step size of weight updates (~1e-4); too high diverges, too low crawls.</td><td>3</td></tr>
+      <tr><td><b>LR scheduler (cosine + warmup)</b></td><td>Ramp up then decay the learning rate over training.</td><td>3</td></tr>
+      <tr><td><b>Gradient accumulation</b></td><td>Sum gradients over N steps to simulate a bigger batch without more memory.</td><td>3</td></tr>
+      <tr><td><b>Optimizer (paged_adamw)</b></td><td>Adam with momentum, memory-paged; converges faster than plain SGD.</td><td>3</td></tr>
+      <tr><td><b>SFTTrainer / SFTConfig</b></td><td>TRL classes that run the supervised fine-tuning loop from model + data + LoRA + args.</td><td>3</td></tr>
+      <tr><td><b>Weights &amp; Biases (wandb)</b></td><td>Experiment tracker: logs loss, LR, metrics per step; compare runs.</td><td>3, 4</td></tr>
+      <tr><td><b>Training vs validation loss</b></td><td>Train loss always falls; validation loss on held-out data reveals real generalization.</td><td>4</td></tr>
+      <tr><td><b>Overfitting signature</b></td><td>Train loss ↓ while validation loss ↑ (often spiking at a new epoch) = memorizing.</td><td>4</td></tr>
+      <tr><td><b>Checkpoint / push_to_hub</b></td><td>Saving model state to the HF hub every N steps during training.</td><td>4</td></tr>
+      <tr><td><b>Best checkpoint selection</b></td><td>Ship the lowest-validation-loss checkpoint, not the final step.</td><td>4</td></tr>
+      <tr><td><b>Softmax</b></td><td>Turns LM-head logits into a probability distribution over the vocabulary (sums to 1).</td><td>5</td></tr>
+      <tr><td><b>Cross-entropy loss</b></td><td>−log(probability of the true next token); the standard LLM training loss.</td><td>5</td></tr>
+      <tr><td><b>Backpropagation</b></td><td>Chain-rule gradient computation; here only the LoRA adapters receive gradients.</td><td>5</td></tr>
+      <tr><td><b>Top-k weighted estimate</b></td><td>Averaging top-k token values by probability for a sharper numeric prediction.</td><td>5</td></tr>
+    </tbody>
+  </table>
+
+  <p class="teacher">
+    <b>Your reference doc — it outlives the lessons.</b> Fuzzy on a row? Ask me to re-teach just that one.
+    Back to <a href="../lessons/0031-day1-qlora.html">Week 7 Day 1</a>.
+  </p>
+
+</div>
+</body>
+</html>

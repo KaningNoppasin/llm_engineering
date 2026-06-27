@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W7 Day 4 — Monitoring &amp; Catching Overfitting</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 7 <span class="dot">●</span> Day 4 Recap</p>
+    <h1>Monitoring &amp; catching overfitting</h1>
+    <p class="subtitle">Read the loss curves, train on 800K points, and pick the best checkpoint.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> reading a training run — spotting overfitting,
+    choosing a checkpoint, not wasting a 21-hour GPU run — is the operational maturity that separates "I
+    can train a model" from "I can train a model that ships."
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can read training vs validation loss in Weights &amp; Biases, recognize overfitting, and pick
+    the best checkpoint instead of the last one.</p>
+  </div>
+
+  <h2>The one rule of monitoring</h2>
+  <p>
+    <b>Training loss alone lies.</b> It always falls. What tells the truth is <b>validation loss</b> on
+    held-out data. When training loss keeps dropping but validation loss <em>rises</em>, the model is
+    <b>memorizing</b>, not learning — that's overfitting.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>Healthy curve:</b> train and validation loss fall together. <b>Overfitting:</b> they diverge —
+      train ↓, validation ↑.</li>
+    <li><b>The epoch-boundary spike.</b> Validation loss jumping up when a new epoch starts is a classic
+      overfitting signature — the model has memorized prior-epoch examples.</li>
+    <li><b>Scale of the full run.</b> 800K points × 3 epochs = 2.4M examples on a Colab <b>A100</b> (80GB,
+      ~70GB used), ~<b>21 hours</b> (under Colab's 24h cap).</li>
+    <li><b>Save checkpoints <em>during</em> training.</b> <code>push_to_hub=True</code> + <code>save_steps</code>
+      writes checkpoints to the HF hub every N steps — don't wait for the end to pick a model.</li>
+    <li><b>Early stopping by selection.</b> The best model is the checkpoint with the <em>lowest validation
+      loss</em> (here ~step 6200, mid-epoch-2), not the final one — recover it via the HF commit history.</li>
+    <li><b>Keep test data sacred.</b> Choosing a checkpoint on validation loss is implicit training on
+      validation; the test set must stay untouched for an honest final number.</li>
+    <li><b>The adapter is small.</b> The best checkpoint is ~1.56GB of LoRA adapters — not the whole model.</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-com"># in SFTConfig: validate + checkpoint to the Hub during training</span>
+args = <span class="c-fn">SFTConfig</span>(
+    eval_strategy=<span class="c-str">"steps"</span>, save_strategy=<span class="c-str">"steps"</span>, save_steps=<span class="c-str">200</span>,
+    per_device_train_batch_size=<span class="c-str">256</span>,        <span class="c-com"># big batch to fill the A100</span>
+    learning_rate=<span class="c-str">1e-3</span>, lr_scheduler_type=<span class="c-str">"cosine"</span>,
+    push_to_hub=<span class="c-str">True</span>,                        <span class="c-com"># every checkpoint -> HF hub</span>
+    report_to=[<span class="c-str">"wandb"</span>],
+)
+
+<span class="c-com"># later: load the BEST checkpoint by its hub revision (commit id)</span>
+model = PeftModel.<span class="c-fn">from_pretrained</span>(base, hub_repo, revision=best_commit)</code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "How did you know when to stop?" — Watch validation loss in W&amp;B; it
+    bottomed mid-epoch-2 then rose at epoch 3 (overfitting). The deliverable is the <em>checkpoint</em> at
+    that minimum — saved live via <code>push_to_hub</code>, not the final-step weights.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Interleaves a Week 6 idea with today's monitoring.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"Why is validation loss more trustworthy than training loss?","options":["It is always lower than training loss","It is measured on held-out data, revealing generalization","It is computed faster during training","It ignores the hardest examples"],"answer":1,"why":"Training loss always falls and can reflect memorization; validation loss on unseen data shows whether the model truly generalizes."},
+    {"q":"What does train loss falling while validation loss rises indicate?","options":["The learning rate is too low","Overfitting — the model is memorizing data","The GPU is running out of memory","Training has fully converged"],"answer":1,"why":"Diverging curves (train down, validation up) mean the model is memorizing the training set rather than learning general patterns."},
+    {"q":"Why save checkpoints to the Hub during training?","options":["To free up GPU memory each step","So you can pick the best checkpoint, not the last","To restart training from scratch faster","Because the Hub requires it for LoRA"],"answer":1,"why":"push_to_hub + save_steps writes checkpoints live, so you can select the one with the lowest validation loss instead of the final weights."},
+    {"q":"Which checkpoint should you ship?","options":["The very last step of training","The one with the lowest validation loss","The one with the lowest training loss","The largest checkpoint by file size"],"answer":1,"why":"The lowest-validation-loss checkpoint generalizes best; the final step is often already overfitting."},
+    {"q":"(Week 6 recall) Why must the test set stay separate from validation?","options":["To make training run faster overall","Selecting on validation is implicit training on it","Test data is always larger than validation","The model cannot read both at once"],"answer":1,"why":"As in Week 6, choosing a model by validation loss tunes to that data; an untouched test set is needed for an honest generalization number."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>Weights &amp; Biases — <a href="https://docs.wandb.ai/guides/track">tracking experiments</a> and
+    their <a href="https://wandb.ai/site/articles/overfitting-vs-underfitting">overfitting vs underfitting</a>
+    explainer (reading the curves).</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to interpret a real W&amp;B loss chart, or set up early stopping
+    properly? Ask. See the <a href="../reference/glossary.html">Week 7 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0033-day3-training-config.html">← Day 3</a>
+    <a href="0035-day5-results-and-cross-entropy.html">Day 5 — Results &amp; cross-entropy →</a>
+  </nav>
+
+</div>
+</body>
+</html>
