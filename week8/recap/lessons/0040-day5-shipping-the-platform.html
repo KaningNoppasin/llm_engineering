@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W8 Day 5 — Shipping the Platform (Finale)</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 8 <span class="dot">●</span> Day 5 Recap <span class="dot">●</span> Finale</p>
+    <h1>Shipping the platform</h1>
+    <p class="subtitle">An autonomous, self-running deal-hunter — the whole course in one app.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> this is the finish line. You ship a complete,
+    autonomous AI product that runs itself, prices deals across three models, remembers what it's seen,
+    and notifies you. That system <em>is</em> your portfolio — and your proof you're now an AI engineer.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can wire the whole platform into a Gradio UI that runs the agent framework on a timer — a
+    self-driving system, no human kick-off needed.</p>
+  </div>
+
+  <h2>The full stack, in one diagram</h2>
+  <p>
+    The final app ties together everything from eight weeks: a <b>fine-tuned model on Modal</b> +
+    <b>RAG</b> + <b>ensemble</b> pricing, a <b>scanner</b> using <b>structured outputs</b>, a
+    <b>planning agent</b> orchestrating it all, <b>persistent memory</b>, <b>push notifications</b>, and a
+    live <b>Gradio</b> UI — running <em>autonomously</em>.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>Autonomous scheduling.</b> <code>gr.Timer(value=300, active=True)</code> ticks every 5 minutes
+      and runs the entire agent workflow with no human input — the system drives itself.</li>
+    <li><b>The deals table.</b> A <code>gr.Dataframe</code> shows each opportunity: description, deal
+      price, estimated value, discount, and URL.</li>
+    <li><b>Live observability.</b> A logging queue streams colored per-agent logs into the UI so you can
+      watch the agents work in real time; a 3D Plotly scatter visualizes the Chroma vectors.</li>
+    <li><b>Memory prevents repeats.</b> Past <code>Opportunity</code> objects are loaded from JSON and
+      passed into prompts, so the platform never re-recommends a deal it already found.</li>
+    <li><b>Three definitions of "agentic".</b> Works independently (Altman); the LLM controls the
+      workflow (2025 consensus); an LLM in a loop with tools achieving a goal — <em>your</em> system.</li>
+    <li><b>The 8-week skill stack.</b> tokens &amp; APIs → providers &amp; UIs → open models → model
+      selection &amp; eval → RAG → data &amp; fine-tuning → QLoRA → <b>agents &amp; deployment</b>. You've
+      now done all of it.</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-com"># turn opportunities into rows for the table</span>
+<span class="c-kw">def</span> <span class="c-fn">table_for</span>(opps):
+    <span class="c-kw">return</span> [[o.deal.product_description, <span class="c-str">f"${o.deal.price:.2f}"</span>,
+             <span class="c-str">f"${o.estimate:.2f}"</span>, <span class="c-str">f"${o.discount:.2f}"</span>, o.deal.url] <span class="c-kw">for</span> o <span class="c-kw">in</span> opps]
+
+<span class="c-kw">with</span> gr.<span class="c-fn">Blocks</span>() <span class="c-kw">as</span> ui:
+    opportunities = gr.<span class="c-fn">Dataframe</span>(headers=[<span class="c-str">"Deal"</span>, <span class="c-str">"Price"</span>, <span class="c-str">"Estimate"</span>, <span class="c-str">"Discount"</span>, <span class="c-str">"URL"</span>])
+    logs = gr.<span class="c-fn">HTML</span>()
+    timer = gr.<span class="c-fn">Timer</span>(value=<span class="c-str">300</span>, active=<span class="c-str">True</span>)         <span class="c-com"># every 5 minutes...</span>
+    timer.<span class="c-fn">tick</span>(run_framework, outputs=[opportunities, logs])  <span class="c-com"># ...run the whole agent suite</span>
+ui.<span class="c-fn">launch</span>()</code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "Walk me through an end-to-end LLM system you built." — This is it:
+    deployment (Modal), retrieval (RAG/Chroma), specialization (QLoRA fine-tune), reliability (structured
+    outputs), orchestration (multi-agent loop), memory, and a self-running UI. Name the trade-off at each layer.
+  </div>
+
+  <h2>Test yourself — the course capstone quiz</h2>
+  <p class="note">Final quiz of the whole recap — it interleaves Weeks 1, 5, 7 and 8.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What does <code>gr.Timer(value=300, active=True)</code> do?","options":["Limits each agent to 300 tokens","Runs the agent workflow every 5 minutes autonomously","Times out the app after 300 seconds","Caps the UI to 300 deals shown"],"answer":1,"why":"The timer ticks every 300 seconds and triggers the full agent run, making the platform self-driving without human input."},
+    {"q":"How does the platform avoid recommending the same deal twice?","options":["It deletes the vector store each run","Persistent memory of past deals is fed into prompts","It only ever runs a single time","It lowers the temperature to zero"],"answer":1,"why":"Found Opportunities persist to JSON and are passed into prompts on later runs, so the agent skips deals it already surfaced."},
+    {"q":"Which best captures \"agentic\" as built in this system?","options":["A single one-shot prompt to GPT","An LLM in a loop with tools achieving a goal","A model fine-tuned only on agent data","A chatbot that streams its replies"],"answer":1,"why":"The system is an LLM looping over tools (scan/price/notify) with memory to autonomously achieve a goal — the emerging definition of agentic."},
+    {"q":"(Week 7 recall) The platform&#39;s specialist pricer is…","options":["a frontier model with a huge context window","the QLoRA fine-tuned Llama deployed on Modal","a keyword search over the deals","a scikit-learn linear regression"],"answer":1,"why":"The specialist is the Week 7 QLoRA fine-tuned Llama 3.2, deployed serverlessly on Modal and called remotely."},
+    {"q":"(Whole-course synthesis) Why does the ensemble beat any single pricer?","options":["It uses the most expensive model","Diverse models err differently, so blending cancels error","It memorized the test set answers","It has the largest context window"],"answer":1,"why":"Specialist (fine-tuned), frontier (RAG), and neural net make uncorrelated errors; combining them cancels noise — the Day 2 ensemble lesson."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>Gradio — <a href="https://www.gradio.app/docs/gradio/timer">Timer</a> and
+    <a href="https://www.gradio.app/guides/blocks-and-event-listeners">Blocks</a>. And the best next step:
+    your own project — ship something and put it on GitHub / Hugging Face Spaces.</p>
+  </div>
+
+  <p class="teacher">
+    <b>You did it — eight weeks recapped.</b> Ask me for a <em>mixed Week 1–8 exam</em> to lock it all in,
+    a deeper dive on any topic, or help turning the capstone into a portfolio piece. The
+    <a href="../reference/glossary.html">Week 8 glossary</a> and the
+    <a href="0036-day1-modal-deployment.html">Week 8 index</a> are here whenever you review.
+  </p>
+
+  <nav class="nav">
+    <a href="0039-day4-multi-agent.html">← Day 4</a>
+    <a href="../reference/glossary.html">Week 8 glossary →</a>
+  </nav>
+
+</div>
+</body>
+</html>

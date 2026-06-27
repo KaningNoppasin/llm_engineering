@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 8 Glossary — LLM Engineering</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 8 <span class="dot">●</span> Reference</p>
+    <h1>Week 8 glossary</h1>
+    <p class="subtitle">Deployment, ensembles, structured outputs &amp; agents — the finale. Print &amp; pin.</p>
+  </header>
+
+  <p class="note">New terms from Week 8. See also the
+  <a href="../../../week1/recap/reference/glossary.html">Week 1</a>,
+  <a href="../../../week2/recap/reference/glossary.html">2</a>,
+  <a href="../../../week3/recap/reference/glossary.html">3</a>,
+  <a href="../../../week4/recap/reference/glossary.html">4</a>,
+  <a href="../../../week5/recap/reference/glossary.html">5</a>,
+  <a href="../../../week6/recap/reference/glossary.html">6</a>, and
+  <a href="../../../week7/recap/reference/glossary.html">7</a> glossaries.</p>
+
+  <table>
+    <thead><tr><th>Term</th><th>Meaning</th><th>Day</th></tr></thead>
+    <tbody>
+      <tr><td><b>Agentic AI</b></td><td>An LLM controlling a workflow with agency — choosing tools in a loop until a goal is met.</td><td>1, 4</td></tr>
+      <tr><td><b>Modal</b></td><td>Serverless platform; define container/GPU/secrets in Python, pay per compute used.</td><td>1</td></tr>
+      <tr><td><b>Ephemeral vs deployed</b></td><td><code>modal run</code> ships code each time (slow); <code>modal deploy</code> builds once (fast).</td><td>1</td></tr>
+      <tr><td><b>Modal secret</b></td><td>Securely stored API key injected as an env var into a remote function.</td><td>1</td></tr>
+      <tr><td><b>Modal volume</b></td><td>Persistent disk caching model weights across invocations to cut cold starts.</td><td>1</td></tr>
+      <tr><td><b>Cold start</b></td><td>First-call latency to spin up a container and load weights (mitigated by deploy + volume).</td><td>1</td></tr>
+      <tr><td><b>.remote()</b></td><td>Calls a deployed Modal function/class method in the cloud and returns the result.</td><td>1</td></tr>
+      <tr><td><b>Specialist agent</b></td><td>The fine-tuned Llama pricer (Week 7) deployed on Modal.</td><td>1, 2</td></tr>
+      <tr><td><b>RAG pricer (frontier)</b></td><td>Retrieves similar priced items as context for a frontier model to estimate price.</td><td>2</td></tr>
+      <tr><td><b>Ensemble</b></td><td>Blending multiple diverse models; uncorrelated errors cancel for a better result.</td><td>2</td></tr>
+      <tr><td><b>Structured outputs</b></td><td>Forcing the model to return data matching a Pydantic schema.</td><td>3</td></tr>
+      <tr><td><b>Constrained decoding</b></td><td>Zeroing out tokens that would break the schema, so only valid JSON is emitted.</td><td>3</td></tr>
+      <tr><td><b>Pydantic BaseModel</b></td><td>A class defining a schema; used as <code>response_format</code> for structured outputs.</td><td>3</td></tr>
+      <tr><td><b>parse()</b></td><td><code>chat.completions.parse(response_format=Model)</code> returns a typed <code>.parsed</code> object.</td><td>3</td></tr>
+      <tr><td><b>Deal scanner</b></td><td>Agent that reads RSS feeds and extracts structured deals (description, price, url).</td><td>3</td></tr>
+      <tr><td><b>Pushover</b></td><td>Service for sending push notifications to your phone via a simple POST.</td><td>3</td></tr>
+      <tr><td><b>Planning agent</b></td><td>An agent that orchestrates other agents (as tools) to accomplish a goal.</td><td>4</td></tr>
+      <tr><td><b>Agent loop</b></td><td><code>while not done</code>: call model with tools, run any tool calls, repeat until plain text.</td><td>4</td></tr>
+      <tr><td><b>Tool orchestration</b></td><td>Exposing each agent's method as a tool so a planner can call them autonomously.</td><td>4</td></tr>
+      <tr><td><b>DealAgentFramework</b></td><td>Orchestrator wiring agents + Chroma + logging + persistent memory + the run cycle.</td><td>4, 5</td></tr>
+      <tr><td><b>Memory (memory.json)</b></td><td>Persisted Opportunity objects fed back into prompts so the agent avoids repeats.</td><td>4, 5</td></tr>
+      <tr><td><b>gr.Timer</b></td><td>Gradio component that ticks on an interval to run the workflow autonomously.</td><td>5</td></tr>
+      <tr><td><b>Observability / logging queue</b></td><td>Streaming per-agent logs into the UI to watch the system run live.</td><td>5</td></tr>
+      <tr><td><b>The 8-week stack</b></td><td>Tokens/APIs → UIs → open models → selection/eval → RAG → data/fine-tune → QLoRA → agents/deploy.</td><td>5</td></tr>
+    </tbody>
+  </table>
+
+  <p class="teacher">
+    <b>Your reference doc — it outlives the lessons.</b> Fuzzy on a row? Ask me to re-teach just that one.
+    Back to <a href="../lessons/0036-day1-modal-deployment.html">Week 8 Day 1</a>, or the
+    <a href="../index.html">Week 8 index</a>.
+  </p>
+
+</div>
+</body>
+</html>

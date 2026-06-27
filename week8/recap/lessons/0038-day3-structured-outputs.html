@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W8 Day 3 — Structured Outputs &amp; the Deal Scanner</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 8 <span class="dot">●</span> Day 3 Recap</p>
+    <h1>Structured outputs &amp; the deal scanner</h1>
+    <p class="subtitle">Force the model to return a typed object — guaranteed, not hoped-for.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> real systems need <em>reliable</em> data out of
+    LLMs, not prose you regex. Structured outputs are how production agents pass data between steps
+    safely — a pattern you'll use in almost every serious LLM app.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can force an LLM to return a validated Pydantic object via constrained decoding, and build a
+    deal-scanner agent that extracts structured deals from messy RSS feeds.</p>
+  </div>
+
+  <h2>The big upgrade over Week 5's JSON</h2>
+  <p>
+    Week 5 used <code>response_format={"type":"json_object"}</code> — valid JSON, but any shape.
+    <b>Structured outputs</b> go further: you give a <b>Pydantic</b> schema and <b>constrained decoding</b>
+    guarantees the reply matches it — the client even hands you back a typed Python object.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>Define the shape as a Pydantic <code>BaseModel</code>.</b> Class attributes (with
+      <code>Field</code> descriptions) become a JSON schema the model must fill.</li>
+    <li><b>Constrained decoding is the magic.</b> At each step, the provider zeroes out token
+      probabilities that would break the schema — so the model can <em>only</em> emit valid JSON.</li>
+    <li><b>You get an object, not a string.</b> <code>...parse(response_format=DealSelection)</code>
+      returns <code>message.parsed</code> as a <code>DealSelection</code> instance — no parsing code.</li>
+    <li><b>The deal scanner.</b> Pull RSS deal feeds (Feedparser), pass the noisy text to the model, and
+      extract clean <code>Deal</code>s: <code>product_description</code>, <code>price</code>, <code>url</code>.</li>
+    <li><b>LLMs beat regex at messy parsing.</b> "$100 off $500" → the model correctly returns
+      <code>price=400</code>; brittle parsers can't reason about that.</li>
+    <li><b>Notify via Pushover.</b> A messaging agent crafts a hype message and POSTs it to Pushover to
+      ping your phone about a good deal.</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-kw">from</span> pydantic <span class="c-kw">import</span> BaseModel
+
+<span class="c-kw">class</span> <span class="c-fn">Deal</span>(BaseModel):
+    product_description: str
+    price: <span class="c-fn">float</span>          <span class="c-com"># actual price ("$100 off $500" -> 400)</span>
+    url: str
+
+<span class="c-kw">class</span> <span class="c-fn">DealSelection</span>(BaseModel):
+    deals: <span class="c-fn">list</span>[Deal]
+
+<span class="c-com"># constrained decoding: the reply MUST match the schema</span>
+resp = openai.chat.completions.<span class="c-fn">parse</span>(
+    model=<span class="c-str">"gpt-5-mini"</span>,
+    messages=[{<span class="c-str">"role"</span>: <span class="c-str">"system"</span>, <span class="c-str">"content"</span>: SYS}, {<span class="c-str">"role"</span>: <span class="c-str">"user"</span>, <span class="c-str">"content"</span>: feed_text}],
+    response_format=DealSelection)
+<span class="c-kw">for</span> deal <span class="c-kw">in</span> resp.choices[<span class="c-str">0</span>].message.parsed.deals:   <span class="c-com"># typed objects!</span>
+    <span class="c-fn">print</span>(deal.price, deal.url)</code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "json_object vs structured outputs?" — <code>json_object</code> only
+    promises <em>valid JSON</em> (any keys); <b>structured outputs</b> use constrained decoding to
+    guarantee your <em>exact schema</em>, and deserialize to a typed object. Use the latter whenever shape matters.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Interleaves a Week 5 idea with today's structured outputs.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What does constrained decoding do?","options":["Speeds up generation by skipping tokens","Zeros out tokens that would break the schema","Compresses the JSON to save tokens","Retries the call until JSON is valid"],"answer":1,"why":"At each step it removes the probability of any token that would violate the schema, so the model can only produce schema-valid JSON."},
+    {"q":"What do you get back from a structured-outputs call?","options":["A raw JSON string to parse yourself","A typed Pydantic object instance","A list of token probabilities","A plain-text description of the data"],"answer":1,"why":"The client deserializes the guaranteed-valid JSON into your Pydantic model, so message.parsed is a typed object — no parsing code."},
+    {"q":"For a deal listed as \"$100 off $500\", what is the price field?","options":["100, the discount amount","400, the actual price after discount","500, the original price","600, the combined total"],"answer":1,"why":"The price field is the actual cost; the model reasons that $100 off $500 means you pay 400 — something regex struggles with."},
+    {"q":"Why use an LLM instead of regex to parse the deal feeds?","options":["Regex cannot read RSS feeds at all","LLMs reason about messy, varied descriptions","LLMs are always faster than regex","Regex requires a GPU to run"],"answer":1,"why":"Deal feeds are unstructured and inconsistent; an LLM reasons about price logic and descriptions far better than brittle pattern matching."},
+    {"q":"(Week 5 recall) How is this stronger than <code>json_object</code> mode?","options":["It returns prose instead of JSON","It guarantees your exact schema, not just valid JSON","It avoids needing any prompt","It runs without an API key"],"answer":1,"why":"json_object only guarantees syntactically valid JSON of any shape; structured outputs constrain decoding to your specific Pydantic schema."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>OpenAI — <a href="https://platform.openai.com/docs/guides/structured-outputs">Structured Outputs</a>
+    (Pydantic schemas, <code>parse</code>, constrained decoding). Pydantic —
+    <a href="https://docs.pydantic.dev/latest/">docs</a>.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to design a schema for a different extraction task, or wire up the
+    Pushover notification? Ask. See the <a href="../reference/glossary.html">Week 8 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0037-day2-rag-ensemble.html">← Day 2</a>
+    <a href="0039-day4-multi-agent.html">Day 4 — Multi-agent orchestration →</a>
+  </nav>
+
+</div>
+</body>
+</html>

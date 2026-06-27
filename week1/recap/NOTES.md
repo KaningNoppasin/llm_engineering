@@ -46,7 +46,12 @@
   adapters, dataset prep (base model), hyperparameters + TRL SFTTrainer + W&B, monitoring/overfitting,
   cross-entropy; fine-tuned Llama 3.2 3B ($39.85) beats GPT-5.1 ($44.74). Days 3&4 share a notebook.
   See [week7 learning record](../../week7/recap/learning-records/0007-week7-qlora-finetuning.md).
-- **Next:** after spacing, a mixed Week 1–7 exam; then the **Week 8** recap (productionizing — the finale).
+- **Week 8 recap: done** (lessons 0036–0040, `week8/recap/`) — FINALE: Modal serverless deployment, RAG
+  ensemble (3 pricers → $29.90 MAE), structured outputs + deal scanner, multi-agent orchestration, the
+  shipped autonomous "Price is Right" platform (gr.Timer). See
+  [week8 learning record](../../week8/recap/learning-records/0008-week8-agents-and-deployment.md).
+- **🎉 COURSE RECAP COMPLETE — Weeks 1–8, 40 lessons (0001–0040).** Next: a spaced mixed Week 1–8 exam,
+  then turn the capstone into a portfolio piece + interview prep (shift toward wisdom / real projects).
 
 ## Quiz authoring rule (learned the hard way)
 - Inside `data-quiz='...'` JSON, every apostrophe MUST be the entity `&#39;` — a raw `'`

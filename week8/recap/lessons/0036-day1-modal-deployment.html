@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W8 Day 1 — Serverless Deployment on Modal</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 8 <span class="dot">●</span> Day 1 Recap</p>
+    <h1>Serverless deployment on Modal</h1>
+    <p class="subtitle">Put your fine-tuned model in the cloud and call it as a remote service.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> a model that only runs in your notebook isn't a
+    product. Deploying it serverlessly — GPU on demand, pay-per-use, callable from anywhere — is the
+    step that makes you an AI <em>engineer</em>, not just a notebook tinkerer.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can deploy the fine-tuned Llama pricer to Modal with a GPU and persistent storage, and call
+    it remotely with <code>.remote()</code> — the first agent in the platform.</p>
+  </div>
+
+  <h2>What Modal gives you</h2>
+  <p>
+    <b>Modal</b> is a serverless platform: you describe the container (image, GPU, secrets) <em>in
+    Python</em> with decorators, and Modal runs it in the cloud, billing only for compute used. No
+    servers to manage, GPUs on demand.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>Agentic AI, defined.</b> An LLM that controls a workflow with agency — deciding steps,
+      calling tools in a loop until a goal is met. An "agent" can start as simply as Python wrapping a
+      model call.</li>
+    <li><b>Infrastructure as code.</b> <code>@app.function(image=…, gpu="T4", secrets=…)</code> declares
+      the environment; Modal builds and runs it.</li>
+    <li><b>Ephemeral vs deployed.</b> <code>modal run</code> ships your code each time (slow cold start
+      ~1m20s); <code>modal deploy</code> builds once so later calls stay fast (~30s cold, ~2s warm).</li>
+    <li><b>Secrets</b> keep API keys (e.g. your HF token) out of code — stored in Modal, injected as env
+      vars into the remote function.</li>
+    <li><b>Volumes = persistent disk.</b> Cache the multi-GB model weights on a Modal <b>volume</b> so
+      you don't re-download them every cold start.</li>
+    <li><b>Call it remotely.</b> <code>modal.Cls.from_name("pricer-service", "Pricer")()</code> gets a
+      handle; <code>.price.remote(description)</code> runs it in the cloud and returns the result.</li>
+    <li><b>Preprocess to match training.</b> Format inference input exactly like the training prompts so
+      the fine-tuned model behaves consistently.</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-kw">import</span> modal
+app = modal.<span class="c-fn">App</span>(<span class="c-str">"pricer-service"</span>)
+image = modal.<span class="c-fn">Image</span>.<span class="c-fn">debian_slim</span>().<span class="c-fn">pip_install</span>(<span class="c-str">"torch"</span>, <span class="c-str">"transformers"</span>, <span class="c-str">"peft"</span>)
+secrets = [modal.Secret.<span class="c-fn">from_name</span>(<span class="c-str">"huggingface-secret"</span>)]
+
+<span class="c-fn">@app.cls</span>(image=image, secrets=secrets, gpu=<span class="c-str">"T4"</span>, timeout=<span class="c-str">1800</span>)
+<span class="c-kw">class</span> <span class="c-fn">Pricer</span>:
+    <span class="c-fn">@modal.method</span>()
+    <span class="c-kw">def</span> <span class="c-fn">price</span>(self, description: str) -> <span class="c-fn">float</span>:
+        <span class="c-com"># load 4-bit base + LoRA adapters, generate, parse the number</span>
+        <span class="c-kw">return</span> price
+
+<span class="c-com"># deploy once, then call from anywhere:</span>
+<span class="c-com">#   modal deploy -m pricer_service</span>
+pricer = modal.Cls.<span class="c-fn">from_name</span>(<span class="c-str">"pricer-service"</span>, <span class="c-str">"Pricer"</span>)()
+pricer.price.<span class="c-fn">remote</span>(<span class="c-str">"Used iPhone 14, 128GB, good condition"</span>)</code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "What's a cold start and how do you fight it?" — The first call after
+    idle must spin up a container and load weights (~1m+). <code>deploy</code> (build once) + a
+    <code>volume</code> (cache weights) cut it to ~30s; keeping it warm cuts it to ~2s.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">One question reaches back to Week 7 — interleaving is deliberate.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What is the difference between <code>modal run</code> and <code>modal deploy</code>?","options":["Run is for GPUs; deploy is for CPUs only","Run ships code each time; deploy builds once for fast calls","Run is paid; deploy is always free","There is no real difference between them"],"answer":1,"why":"Ephemeral run sends fresh code each invocation (slow cold start); deploy builds the app once so subsequent calls reuse the container and stay fast."},
+    {"q":"Why cache model weights on a Modal volume?","options":["To encrypt the weights at rest","To avoid re-downloading multi-GB files each cold start","To convert the model to 4-bit automatically","To share the model with other Modal users"],"answer":1,"why":"A persistent volume keeps the downloaded weights on disk across invocations, cutting cold-start time roughly in half."},
+    {"q":"How do you invoke a deployed Modal class method from your code?","options":["Import the class and call it directly","Get a handle with from_name() and call .remote()","Send an HTTP POST to localhost:8000","Run the notebook cell that defined it"],"answer":1,"why":"modal.Cls.from_name(app, class)() returns a handle; calling .remote(args) executes the method in the cloud and returns the result."},
+    {"q":"Why store API keys as Modal secrets?","options":["Secrets make the function run faster","To keep credentials out of code and inject them as env vars","Modal requires a secret for every function","Secrets increase the GPU memory available"],"answer":1,"why":"Secrets store tokens securely in Modal and inject them as environment variables into the remote function, keeping them out of code and git."},
+    {"q":"(Week 7 recall) The deployed Pricer loads the fine-tuned model how?","options":["As a single merged full-precision checkpoint","4-bit base model plus the trained LoRA adapters","By retraining it on each cold start","As a frozen scikit-learn regressor"],"answer":1,"why":"Same as Week 7 inference: load the quantized base and overlay the trained LoRA adapters (PeftModel) before generating."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>Modal — <a href="https://modal.com/docs/guide">the guide</a> (apps, images, GPUs, volumes,
+    secrets) and <a href="https://modal.com/docs/examples">examples</a> of deploying ML models.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to understand Modal's pricing model, or deploy a different model? Ask.
+    Terms live in the <a href="../reference/glossary.html">Week 8 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <span></span>
+    <a href="0037-day2-rag-ensemble.html">Day 2 — RAG ensemble →</a>
+  </nav>
+
+</div>
+</body>
+</html>

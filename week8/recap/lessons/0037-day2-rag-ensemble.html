@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W8 Day 2 — RAG Pricer &amp; the Ensemble</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 8 <span class="dot">●</span> Day 2 Recap</p>
+    <h1>RAG pricer &amp; the ensemble</h1>
+    <p class="subtitle">Three flawed models, combined, beat every one alone.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> ensembling is a quietly powerful production trick —
+    combine diverse models and the errors cancel. Knowing <em>why</em> it works (uncorrelated errors)
+    and building one is exactly the kind of practical ML judgment teams pay for.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can build a RAG-based frontier pricer (vector-search for similar products → GPT context) and
+    combine three different pricers into an ensemble that beats them all.</p>
+  </div>
+
+  <h2>The three pricers, then a blend</h2>
+  <p>
+    You now have three ways to price a product: the <b>specialist</b> (fine-tuned Llama on Modal), the
+    <b>frontier RAG</b> pricer (GPT-5.1 fed similar items found by vector search), and the <b>neural
+    network</b> from Week 6. Each errs differently — so you <b>ensemble</b> them.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>RAG without LangChain.</b> Raw <code>chromadb</code> + an encoder: embed 800K product
+      descriptions (all-MiniLM-L6-v2, 384 dims) once, then query for the k nearest at price time.</li>
+    <li><b>The frontier RAG pricer.</b> For a new item, retrieve 5 similar items <em>with known prices</em>,
+      put them in the prompt as context, and ask GPT-5.1 to estimate — grounding the guess in real comps.</li>
+    <li><b>RAG beat fine-tuning this time.</b> Frontier-RAG hit <b>$30.19</b> MAE vs the fine-tuned
+      specialist's $39.85 — an inference-time technique beating an expensive training one.</li>
+    <li><b>Ensembles cancel error.</b> If model A overshoots by $10 and B undershoots by $10, the blend
+      is right. Gains are biggest when the models are <em>diverse</em> (different methods err differently).</li>
+    <li><b>The blend.</b> A weighted combination (≈80% RAG + 10% specialist + 10% NN) → <b>$29.90 MAE,
+      R² ≈ 87%</b> — better than any single model.</li>
+    <li><b>Productionize the code.</b> Move from notebooks to modules with type hints, docstrings, and
+      logging; each pricer becomes a reusable <em>agent</em>.</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-com"># RAG pricer: find comps, then ask the frontier model</span>
+<span class="c-kw">def</span> <span class="c-fn">find_similars</span>(item):
+    vec = encoder.<span class="c-fn">encode</span>(item.summary)
+    res = collection.<span class="c-fn">query</span>(query_embeddings=[vec.<span class="c-fn">tolist</span>()], n_results=<span class="c-str">5</span>)
+    <span class="c-kw">return</span> res[<span class="c-str">"documents"</span>][<span class="c-str">0</span>], [m[<span class="c-str">"price"</span>] <span class="c-kw">for</span> m <span class="c-kw">in</span> res[<span class="c-str">"metadatas"</span>][<span class="c-str">0</span>]]
+
+<span class="c-kw">def</span> <span class="c-fn">gpt_rag</span>(item):
+    docs, prices = <span class="c-fn">find_similars</span>(item)
+    msg = <span class="c-str">f"Estimate the price.\n{item.summary}\nSimilar items:\n"</span> + \
+          <span class="c-str">"\n"</span>.<span class="c-fn">join</span>(<span class="c-str">f"- {d} -> ${p}"</span> <span class="c-kw">for</span> d, p <span class="c-kw">in</span> <span class="c-fn">zip</span>(docs, prices))
+    <span class="c-kw">return</span> <span class="c-fn">parse_price</span>(<span class="c-fn">completion</span>(model=<span class="c-str">"gpt-5.1"</span>, messages=[{<span class="c-str">"role"</span>:<span class="c-str">"user"</span>,<span class="c-str">"content"</span>:msg}]))
+
+<span class="c-com"># ensemble: blend three diverse pricers</span>
+<span class="c-kw">def</span> <span class="c-fn">ensemble</span>(item):
+    <span class="c-kw">return</span> <span class="c-fn">gpt_rag</span>(item)*<span class="c-str">0.8</span> + <span class="c-fn">specialist</span>(item)*<span class="c-str">0.1</span> + <span class="c-fn">neural_net</span>(item)*<span class="c-str">0.1</span></code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "Why does an ensemble of weaker models win?" — Only if their errors
+    are <em>uncorrelated</em>. Three models using the same method err the same way (no gain); a
+    fine-tune, a RAG frontier, and a neural net err differently, so blending cancels noise.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Interleaves a Week 5 idea with today's ensemble.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"How does the frontier RAG pricer estimate a price?","options":["It fine-tunes GPT on the item first","It retrieves similar priced items as prompt context","It averages every price in the database","It runs the neural network internally"],"answer":1,"why":"It vector-searches for the k most similar products with known prices and gives them to the frontier model as context to ground the estimate."},
+    {"q":"Why can an ensemble beat each of its component models?","options":["It uses far more parameters total","Diverse models err differently, so blending cancels noise","It always picks the single best model","It retrains the models on the test set"],"answer":1,"why":"When errors are uncorrelated, a weighted blend cancels opposite-direction mistakes; diversity of method is what makes the gain real."},
+    {"q":"What surprising result did Day 2 show?","options":["Fine-tuning always beats RAG on price","The frontier RAG pricer beat the fine-tuned model","The neural net beat every frontier model","Ensembles performed worse than single models"],"answer":1,"why":"The inference-time RAG frontier pricer ($30.19 MAE) beat the fine-tuned specialist ($39.85) — an inference technique outperforming training."},
+    {"q":"What are the three pricers being combined?","options":["Three copies of the same GPT model","Fine-tuned specialist, frontier RAG, neural network","Three different embedding models","Random, constant, and linear baselines"],"answer":1,"why":"The ensemble blends the fine-tuned Llama specialist (Modal), the frontier RAG pricer, and the Week 6 neural network."},
+    {"q":"(Week 5 recall) The RAG pricer here is built…","options":["entirely with the LangChain framework","with raw Chroma + an encoder, no LangChain","without any vector database at all","using only keyword matching"],"answer":1,"why":"Like the advanced Week 5 build, this uses raw chromadb plus an embedding model directly for full control — no LangChain."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>Chroma — <a href="https://docs.trychroma.com/">docs</a> (collections, query); for ensembles, any
+    intro to <a href="https://scikit-learn.org/stable/modules/ensemble.html">ensemble methods</a> and why
+    diversity reduces error.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to learn the proper way to fit ensemble weights with linear regression on
+    a validation set? Ask. See the <a href="../reference/glossary.html">Week 8 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0036-day1-modal-deployment.html">← Day 1</a>
+    <a href="0038-day3-structured-outputs.html">Day 3 — Structured outputs →</a>
+  </nav>
+
+</div>
+</body>
+</html>

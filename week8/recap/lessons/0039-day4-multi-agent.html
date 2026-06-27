@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W8 Day 4 — Multi-Agent Orchestration</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">LLM Engineering <span class="dot">●</span> Week 8 <span class="dot">●</span> Day 4 Recap</p>
+    <h1>Multi-agent orchestration</h1>
+    <p class="subtitle">A planning agent that uses other agents as tools, autonomously.</p>
+  </header>
+
+  <div class="mission">
+    <strong>Why this matters for the switch:</strong> "agents" is the hottest word in AI hiring right
+    now. Building a real multi-agent system — a planner that orchestrates specialized agents via tool
+    calling, with memory — is the single most marketable thing in this course.
+  </div>
+
+  <div class="win">
+    <p class="label">Today's win</p>
+    <p>You can build a planning agent that treats other agents as tools and runs the
+    <code>while not done</code> agent loop until the goal is met.</p>
+  </div>
+
+  <h2>The architecture</h2>
+  <p>
+    A <b>Planning Agent</b> coordinates three specialists as <em>tools</em>: the <b>ScannerAgent</b>
+    (finds deals via structured outputs), the <b>EnsembleAgent</b> (prices them with the three pricers),
+    and the <b>MessagingAgent</b> (notifies you). The <b>DealAgentFramework</b> wires them together with
+    logging and persistent memory.
+  </p>
+
+  <h2>Key concepts</h2>
+  <ul class="concepts">
+    <li><b>Agents as tools.</b> Each specialist's method (<code>scan</code>, <code>estimate</code>,
+      <code>notify</code>) is exposed as a tool JSON definition the planner can call (Week 2's tool
+      calling, scaled up).</li>
+    <li><b>The agent loop is what makes it "agentic."</b> <code>while not done:</code> — call the model
+      with tools; if <code>finish_reason == "tool_calls"</code>, run the tool and loop; else stop.</li>
+    <li><b>Specialized agents collaborate.</b> Scanner → Ensemble pricer → Messenger, each doing one job
+      well — the division-of-labor pattern of real agent systems.</li>
+    <li><b>The framework orchestrates.</b> <code>DealAgentFramework</code> owns the Chroma store, the
+      agents, colored per-agent logging, and the run cycle.</li>
+    <li><b>Memory gives autonomy.</b> Found <code>Opportunity</code> objects persist to
+      <code>memory.json</code> and are fed back into prompts so the agent doesn't re-surface old deals.</li>
+    <li><b>It's genuinely multi-model.</b> One cycle makes ~<b>34 model calls</b> across frontier (GPT-5,
+      GPT-5.1, Claude 4.5) and open-source models — ~30 deals scanned, 5 priced, best one notified.</li>
+  </ul>
+
+  <h2>The code shape to memorize</h2>
+  <pre><code><span class="c-com"># tools = the other agents, described as JSON</span>
+tools = [{<span class="c-str">"type"</span>: <span class="c-str">"function"</span>, <span class="c-str">"function"</span>: scan_fn},
+         {<span class="c-str">"type"</span>: <span class="c-str">"function"</span>, <span class="c-str">"function"</span>: estimate_fn},
+         {<span class="c-str">"type"</span>: <span class="c-str">"function"</span>, <span class="c-str">"function"</span>: notify_fn}]
+
+<span class="c-com"># the agent loop</span>
+done = <span class="c-str">False</span>
+<span class="c-kw">while</span> <span class="c-kw">not</span> done:
+    response = openai.chat.completions.<span class="c-fn">create</span>(model=MODEL, messages=messages, tools=tools)
+    <span class="c-kw">if</span> response.choices[<span class="c-str">0</span>].finish_reason == <span class="c-str">"tool_calls"</span>:
+        msg = response.choices[<span class="c-str">0</span>].message
+        messages.<span class="c-fn">append</span>(msg)
+        messages.<span class="c-fn">extend</span>(<span class="c-fn">handle_tool_call</span>(msg))   <span class="c-com"># dispatch to the right agent</span>
+    <span class="c-kw">else</span>:
+        done = <span class="c-str">True</span></code></pre>
+
+  <div class="gotcha">
+    <b>Interview-ready framing:</b> "What makes a system 'agentic' and not just a script?" — The
+    <em>loop with autonomy</em>: the LLM decides which tool to call next and when it's finished, rather
+    than you hard-coding the sequence. Tools + loop + memory = an agent.
+  </div>
+
+  <h2>Test yourself</h2>
+  <p class="note">Interleaves a Week 2 idea with today's orchestration.</p>
+  <div class="quiz" data-quiz='[
+    {"q":"What makes the planning loop \"agentic\"?","options":["It uses the largest available model","The LLM decides tool calls until it is done","It runs on a serverless GPU platform","It always calls every tool exactly once"],"answer":1,"why":"The while-not-done loop lets the LLM autonomously choose which tools to call and when the goal is met — not a hard-coded sequence."},
+    {"q":"How does the planning agent invoke the scanner and pricer?","options":["By importing and calling them directly","As tools, via JSON tool definitions","By sending them HTTP webhooks","By retraining a model for each one"],"answer":1,"why":"Each specialist agent&#39;s method is exposed as a tool definition; the planner calls them through tool calling and a dispatch function."},
+    {"q":"What does persisting Opportunities to <code>memory.json</code> achieve?","options":["It speeds up the embedding step","Autonomy — it avoids re-surfacing old deals","It encrypts the deal data at rest","It replaces the vector database"],"answer":1,"why":"Saved deals are fed back into prompts on later runs so the agent skips already-found opportunities — memory enabling autonomous operation."},
+    {"q":"Roughly how many model calls does one planning cycle make?","options":["Exactly one big call","About 34 across several models","Thousands of tiny calls","None — it is fully rule-based"],"answer":1,"why":"A full cycle makes ~34 calls (≈29 LLM + 5 neural net) across frontier and open-source models coordinating toward one goal."},
+    {"q":"(Week 2 recall) The tool-calling round-trip here works because…","options":["the model executes the agents itself","finish_reason==tool_calls signals a function request","Gradio runs the tools automatically","the tools share one API key"],"answer":1,"why":"Same Week 2 mechanism: finish_reason==\"tool_calls\" means the model wants a tool run; you execute it, append the result, and loop."}
+  ]'></div>
+
+  <div class="source">
+    <p class="label">Primary source to go deeper</p>
+    <p>Anthropic — <a href="https://www.anthropic.com/research/building-effective-agents">Building
+    effective agents</a> (orchestration patterns, when to use multi-agent). OpenAI —
+    <a href="https://platform.openai.com/docs/guides/function-calling">function calling</a>.</p>
+  </div>
+
+  <p class="teacher">
+    <b>Ask me anything.</b> Want to add a fourth agent, or reason about when multi-agent beats a single
+    prompt? Ask. See the <a href="../reference/glossary.html">Week 8 glossary</a>.
+  </p>
+
+  <nav class="nav">
+    <a href="0038-day3-structured-outputs.html">← Day 3</a>
+    <a href="0040-day5-shipping-the-platform.html">Day 5 — Shipping the platform →</a>
+  </nav>
+
+</div>
+</body>
+</html>
